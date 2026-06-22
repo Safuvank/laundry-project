@@ -1,0 +1,44 @@
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+
+import authRoutes from "./modules/auth/routes/auth.routes.js";
+
+import { errorHandler } from "./shared/middlewares/errorHandler.js";
+
+const app = express();
+
+/*
+ Middleware
+*/
+
+app.use(cors());
+
+app.use(express.json());
+
+app.use(cookieParser());
+
+/*
+ Health Check
+*/
+
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Laundry API Running",
+  });
+});
+
+/*
+ Routes
+*/
+
+app.use("/api/v1/auth", authRoutes);
+
+/*
+ Global Error Handler
+*/
+
+app.use(errorHandler);
+
+export default app;
