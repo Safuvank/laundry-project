@@ -27,6 +27,15 @@ export class AuthRepository {
     });
   }
 
+  // async updateUser(
+  //   userId: string,
+  //   data: Partial<{ isEmailVerified: boolean }>,
+  // ) {
+  //   return User.findByIdAndUpdate(userId, data, {
+  //     new: true,
+  //   });
+  // }
+
   async createRefreshToken(tokenData: any) {
     return RefreshToken.create(tokenData);
   }
@@ -49,7 +58,11 @@ export class AuthRepository {
     });
   }
 
-  async createEmailVerification(data: any) {
+  async createEmailVerification(data: {
+    userId: string;
+    token: string;
+    expiresAt: Date;
+  }) {
     return EmailVerification.create(data);
   }
 

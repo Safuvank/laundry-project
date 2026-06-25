@@ -29,6 +29,23 @@ export class AuthController {
     data: result,
   });
 });
+
+
+verifyEmail = asyncHandler(
+ async (req, res) => {
+
+   const result =
+    await authService.verifyEmail(
+      req.body.token
+    );
+
+   return res.status(200).json({
+     success: true,
+     ...result
+   });
+
+ });
+ 
 }
 
 export const authController = new AuthController();

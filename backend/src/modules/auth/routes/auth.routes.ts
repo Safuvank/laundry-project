@@ -8,6 +8,8 @@ import { validateRequest } from "../../../shared/middlewares/validateRequest.js"
 
 import { loginSchema } from "../validators/login.validator.js";
 
+import { verifyEmailSchema } from "../validators/verifyEmail.validator.js";
+
 const router = Router();
 
 /*
@@ -20,10 +22,12 @@ router.post(
   authController.register,
 );
 
+router.post("/login", validateRequest(loginSchema), authController.login);
+
 router.post(
-  "/login",
-  validateRequest(loginSchema),
-  authController.login
+  "/verify-email",
+  validateRequest(verifyEmailSchema),
+  authController.verifyEmail,
 );
 
 export default router;
