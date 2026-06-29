@@ -58,12 +58,19 @@ export class AuthRepository {
     });
   }
 
-  async createEmailVerification(data: {
-    userId: string;
-    token: string;
-    expiresAt: Date;
-  }) {
-    return EmailVerification.create(data);
+  // async createEmailVerification(data: {
+  //   userId: string;
+  //   token: string;
+  //   expiresAt: Date;
+  // }) {
+  //   return EmailVerification.create(data);
+  // }
+
+  async createEmailVerification(data: { userId: string; token: string }) {
+    return EmailVerification.create({
+      ...data,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    });
   }
 
   async findEmailVerification(token: string) {

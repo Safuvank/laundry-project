@@ -12,6 +12,10 @@ import { UnauthorizedError } from "../../../shared/errors/UnauthorizedError.js";
 
 import { EmailVerification } from "../models/emailVerification.model.js";
 
+import { emailService } from "../../mail/mail.module.js";
+
+import { env } from "../../../config/env.js";
+
 export class AuthService {
   /*
    * REGISTER
@@ -37,15 +41,22 @@ export class AuthService {
 
     const verificationToken = generateToken();
 
-    await EmailVerification.create({
-      userId: user._id,
+    const verificationUrl = `${env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+
+    await authRepository.createEmailVerification({
+      userId: user.id,
       token: verificationToken,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+    });
+
+    await emailService.sendVerificationEmail({
+      firstName: user.firstName,
+      email: user.email,
+      verificationUrl,
     });
 
     return {
-      user,
-      verificationToken,
+      message:
+        "Registration successful. Please check your email to verify your account.",
     };
   }
 
