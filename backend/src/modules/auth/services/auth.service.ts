@@ -110,6 +110,77 @@ export class AuthService {
       user,
     };
   }
+
+  /*
+   * FORGOT PASSWORD
+   */
+  async forgotPassword(email: string) {
+    // 1. Find the user
+    const user = await authRepository.findUserByEmail(email);
+
+    // 2. Prevent email enumeration
+    if (!user) {
+      return {
+        message: "If an account exists, a password reset email has been sent.",
+      };
+    }
+
+    // 3. Generate reset token
+    const resetToken = generateToken();
+
+    // 4. Store reset token
+    await authRepository.createPasswordReset({
+      userId: user.id,
+      token: resetToken,
+    });
+
+    // 5. Generate reset URL
+    const resetPasswordUrl = `${env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+    // 6. Send reset email
+    await emailService.sendForgotPasswordEmail({
+      firstName: user.firstName,
+      email: user.email,
+      resetPasswordUrl,
+    });
+
+    // 7. Return success
+    return {
+      message: "If an account exists, a password reset email has been sent.",
+    };
+  }
+
+  /*
+   * RESET PASSWORD
+   */
+  async resetPassword(token: string, password: string) {
+    // Find reset token
+    const passwordReset = await authRepository.findPasswordReset(token);
+
+    if (!passwordReset) {
+      throw new ValidationError("Invalid or expired reset token");
+    }
+
+    // Check expiration
+    if (passwordReset.expiresAt < new Date()) {
+      throw new ValidationError("Reset link has expired");
+    }
+
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+
+    // Update user
+    await authRepository.updateUser(passwordReset.userId.toString(), {
+      password: hashedPassword,
+    });
+
+    // Delete reset token
+    await authRepository.deletePasswordReset(token);
+
+    return {
+      message: "Password reset successfully.",
+    };
+  }
 }
 
 export const authService = new AuthService();

@@ -85,8 +85,19 @@ export class AuthRepository {
     });
   }
 
-  async createPasswordReset(data: any) {
-    return PasswordReset.create(data);
+  // async createPasswordReset(data: any) {
+  //   return PasswordReset.create(data);
+  // }
+
+  async createPasswordReset(data: { userId: string; token: string }) {
+    await PasswordReset.deleteOne({
+      userId: data.userId,
+    });
+
+    return PasswordReset.create({
+      ...data,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    });
   }
 
   async findPasswordReset(token: string) {

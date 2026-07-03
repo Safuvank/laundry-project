@@ -16,36 +16,50 @@ export class AuthController {
   });
 
   login = asyncHandler(async (req: Request, res: Response) => {
-  console.log("LOGIN HIT");
-  console.log(req.body);
+    console.log("LOGIN HIT");
+    console.log(req.body);
 
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  const result = await authService.login(email, password);
+    const result = await authService.login(email, password);
 
-  return res.status(200).json({
-    success: true,
-    message: "Login successful",
-    data: result,
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      data: result,
+    });
   });
-});
 
+  verifyEmail = asyncHandler(async (req, res) => {
+    const result = await authService.verifyEmail(req.body.token);
 
-verifyEmail = asyncHandler(
- async (req, res) => {
+    return res.status(200).json({
+      success: true,
+      ...result,
+    });
+  });
 
-   const result =
-    await authService.verifyEmail(
-      req.body.token
-    );
+  forgotPassword = asyncHandler(async (req, res) => {
+    const { email } = req.body;
 
-   return res.status(200).json({
-     success: true,
-     ...result
-   });
+    const result = await authService.forgotPassword(email);
 
- });
- 
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  });
+
+  resetPassword = asyncHandler(async (req, res) => {
+    const { token, password } = req.body;
+
+    const result = await authService.resetPassword(token, password);
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  });
 }
 
 export const authController = new AuthController();

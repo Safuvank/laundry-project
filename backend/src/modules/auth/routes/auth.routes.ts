@@ -10,11 +10,31 @@ import { loginSchema } from "../validators/login.validator.js";
 
 import { verifyEmailSchema } from "../validators/verifyEmail.validator.js";
 
-const router = Router();
+import { forgotPasswordSchema } from "../validators/forgotPassword.validator.js";
 
-/*
- POST /api/v1/auth/register
-*/
+import { resetPasswordSchema } from "../validators/resetPassword.validator.js";
+
+// const router = Router();
+
+// /*
+//  POST /api/v1/auth/register
+// */
+
+// router.post(
+//   "/register",
+//   validateRequest(registerSchema),
+//   authController.register,
+// );
+
+// router.post("/login", validateRequest(loginSchema), authController.login);
+
+// router.post(
+//   "/verify-email",
+//   validateRequest(verifyEmailSchema),
+//   authController.verifyEmail,
+// );
+
+const router = Router();
 
 router.post(
   "/register",
@@ -28,6 +48,18 @@ router.post(
   "/verify-email",
   validateRequest(verifyEmailSchema),
   authController.verifyEmail,
+);
+
+router.post(
+  "/forgot-password",
+  validateRequest(forgotPasswordSchema),
+  authController.forgotPassword,
+);
+
+router.post(
+  "/reset-password",
+  validateRequest(resetPasswordSchema),
+  authController.resetPassword,
 );
 
 export default router;
