@@ -1,9 +1,11 @@
 import jwt from "jsonwebtoken";
 import { env } from "../../../config/env.js";
 
-const ACCESS_TOKEN_SECRET = env.ACCESS_TOKEN_SECRET!;
+const ACCESS_TOKEN_SECRET = env.ACCESS_TOKEN_SECRET;
 
-const REFRESH_TOKEN_SECRET = env.REFRESH_TOKEN_SECRET!;
+const REFRESH_TOKEN_SECRET = env.REFRESH_TOKEN_SECRET;
+
+// const REFRESH_TOKEN_SECRET = env.REFRESH_TOKEN_SECRET!;
 
 
 export const generateAccessToken = (payload: object) => {

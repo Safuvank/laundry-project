@@ -14,26 +14,6 @@ import { forgotPasswordSchema } from "../validators/forgotPassword.validator.js"
 
 import { resetPasswordSchema } from "../validators/resetPassword.validator.js";
 
-// const router = Router();
-
-// /*
-//  POST /api/v1/auth/register
-// */
-
-// router.post(
-//   "/register",
-//   validateRequest(registerSchema),
-//   authController.register,
-// );
-
-// router.post("/login", validateRequest(loginSchema), authController.login);
-
-// router.post(
-//   "/verify-email",
-//   validateRequest(verifyEmailSchema),
-//   authController.verifyEmail,
-// );
-
 const router = Router();
 
 router.post(
@@ -61,5 +41,12 @@ router.post(
   validateRequest(resetPasswordSchema),
   authController.resetPassword,
 );
+
+// router.post("/refresh", authController.refreshToken);
+router.post("/refresh", authController.refreshToken.bind(authController));
+
+router.post("/logout", authController.logout);
+
+router.post("/logout-all", authController.logoutAll);
 
 export default router;

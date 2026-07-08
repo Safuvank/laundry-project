@@ -1,8 +1,10 @@
-import type { Request, Response } from "express";
+import type { Request, Response, NextFunction } from "express";
 
 import { authService } from "../services/auth.service.js";
 
 import { asyncHandler } from "../../../shared/utils/asyncHandler.js";
+
+import { refreshCookieOptions } from "../utils/cookies.js";
 
 export class AuthController {
   register = asyncHandler(async (req: Request, res: Response) => {
@@ -15,18 +17,38 @@ export class AuthController {
     });
   });
 
-  login = asyncHandler(async (req: Request, res: Response) => {
-    console.log("LOGIN HIT");
-    console.log(req.body);
+  // login = asyncHandler(async (req: Request, res: Response) => {
+  //   console.log("LOGIN HIT");
+  //   console.log(req.body);
 
+  //   const { email, password } = req.body;
+
+  //   const result = await authService.login(email, password);
+
+  //   return res.status(200).json({
+  //     success: true,
+  //     message: "Login successful",
+  //     data: result,
+  //   });
+  // });
+
+  login = asyncHandler(async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
-    const result = await authService.login(email, password);
+    const { accessToken, refreshToken, user } = await authService.login(
+      email,
+      password,
+    );
+
+    res.cookie("refreshToken", refreshToken, refreshCookieOptions);
 
     return res.status(200).json({
       success: true,
       message: "Login successful",
-      data: result,
+      data: {
+        accessToken,
+        user,
+      },
     });
   });
 
@@ -58,6 +80,69 @@ export class AuthController {
     res.status(200).json({
       success: true,
       message: result.message,
+    });
+  });
+
+  // refreshToken = asyncHandler(async (req: Request, res: Response) => {
+  //   const { refreshToken } = req.body;
+
+  //   const data = await authService.refreshToken(refreshToken);
+
+  //   return res.status(200).json({
+  //     success: true,
+  //     message: "Token refreshed successfully.",
+  //     data,
+  //   });
+  // });
+
+  refreshToken = asyncHandler(async (req: Request, res: Response) => {
+    const refreshToken = req.cookies.refreshToken;
+
+    const result = await authService.refreshToken(refreshToken);
+
+    res.cookie("refreshToken", refreshToken, refreshCookieOptions);
+
+    return res.status(200).json({
+      success: true,
+      message: "Token refreshed successfully.",
+      data: {
+        accessToken: result.accessToken,
+      },
+    });
+  });
+
+  // logout = asyncHandler(async (req: Request, res: Response) => {
+  //   const { refreshToken } = req.body;
+
+  //   const data = await authService.logout(refreshToken);
+
+  //   return res.status(200).json({
+  //     success: true,
+  //     message: data.message,
+  //   });
+  // });
+
+  logout = asyncHandler(async (req: Request, res: Response) => {
+    const refreshToken = req.cookies.refreshToken;
+
+    const result = await authService.logout(refreshToken);
+
+    res.clearCookie("refreshToken");
+
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+    });
+  });
+
+  logoutAll = asyncHandler(async (req: Request, res: Response) => {
+    const { userId } = req.body;
+
+    const data = await authService.logoutAll(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: data.message,
     });
   });
 }

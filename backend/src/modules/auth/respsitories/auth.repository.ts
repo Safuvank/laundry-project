@@ -27,17 +27,20 @@ export class AuthRepository {
     });
   }
 
-  // async updateUser(
-  //   userId: string,
-  //   data: Partial<{ isEmailVerified: boolean }>,
-  // ) {
-  //   return User.findByIdAndUpdate(userId, data, {
-  //     new: true,
-  //   });
-  // }
 
-  async createRefreshToken(tokenData: any) {
-    return RefreshToken.create(tokenData);
+
+  /*
+|--------------------------------------------------------------------------
+| Refresh Tokens
+|--------------------------------------------------------------------------
+*/
+
+  async createRefreshToken(data: {
+    userId: string;
+    token: string;
+    expiresAt: Date;
+  }) {
+    return RefreshToken.create(data);
   }
 
   async findRefreshToken(token: string) {
@@ -58,13 +61,6 @@ export class AuthRepository {
     });
   }
 
-  // async createEmailVerification(data: {
-  //   userId: string;
-  //   token: string;
-  //   expiresAt: Date;
-  // }) {
-  //   return EmailVerification.create(data);
-  // }
 
   async createEmailVerification(data: { userId: string; token: string }) {
     return EmailVerification.create({
@@ -85,9 +81,6 @@ export class AuthRepository {
     });
   }
 
-  // async createPasswordReset(data: any) {
-  //   return PasswordReset.create(data);
-  // }
 
   async createPasswordReset(data: { userId: string; token: string }) {
     await PasswordReset.deleteOne({

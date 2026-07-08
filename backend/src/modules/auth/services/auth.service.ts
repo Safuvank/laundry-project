@@ -2,7 +2,11 @@ import { authRepository } from "../respsitories/auth.repository.js";
 
 import { hashPassword, comparePassword } from "../utils/hash.js";
 
-import { generateAccessToken, generateRefreshToken } from "../utils/jwt.js";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} from "../utils/jwt.js";
 
 import { generateToken } from "../utils/tokens.js";
 
@@ -83,27 +87,56 @@ export class AuthService {
    * LOGIN
    */
   async login(email: string, password: string) {
+    // 1. Find user
     const user = await authRepository.findUserByEmail(email);
 
     if (!user) {
-      throw new UnauthorizedError("Invalid credentials");
+      throw new UnauthorizedError("Invalid email or password.");
     }
 
+    // 2. Compare password
     const isPasswordValid = await comparePassword(password, user.password);
 
     if (!isPasswordValid) {
-      throw new UnauthorizedError("Invalid credentials");
+      throw new UnauthorizedError("Invalid email or password.");
     }
 
+    // 3. Check email verification
+    if (!user.isEmailVerified) {
+      throw new UnauthorizedError(
+        "Please verify your email before logging in.",
+      );
+    }
+
+    // 4. Check account status
+    if (user.accountStatus !== "ACTIVE") {
+      throw new UnauthorizedError("Your account is not active.");
+    }
+
+    // 5. Generate access token
     const accessToken = generateAccessToken({
       userId: user.id,
       role: user.role,
     });
 
+    // 6. Generate refresh token
     const refreshToken = generateRefreshToken({
       userId: user.id,
     });
 
+    // 7. Store refresh token
+    await authRepository.createRefreshToken({
+      userId: user.id,
+      token: refreshToken,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    });
+
+    // 8. Update last login
+    await authRepository.updateUser(user.id, {
+      lastLoginAt: new Date(),
+    });
+
+    // 9. Return data
     return {
       accessToken,
       refreshToken,
@@ -179,6 +212,85 @@ export class AuthService {
 
     return {
       message: "Password reset successfully.",
+    };
+  }
+
+  //refresh token
+  async refreshToken(refreshToken: string) {
+    // 1. Verify JWT
+    verifyRefreshToken(refreshToken);
+
+    // 2. Find active session
+    const session = await authRepository.findRefreshToken(refreshToken);
+
+    if (!session) {
+      throw new UnauthorizedError("Invalid refresh token");
+    }
+
+    // 3. Find user
+    const user = await authRepository.findUserById(session.userId.toString());
+
+    if (!user) {
+      throw new UnauthorizedError("User not found");
+    }
+
+    // 4. Generate new tokens
+    const newAccessToken = generateAccessToken({
+      userId: user.id,
+      role: user.role,
+    });
+
+    const newRefreshToken = generateRefreshToken({
+      userId: user.id,
+    });
+
+    // 5. Rotate refresh token
+    await authRepository.deleteRefreshToken(refreshToken);
+
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+    await authRepository.createRefreshToken({
+      userId: user.id,
+      token: newRefreshToken,
+      expiresAt: new Date(Date.now() + THIRTY_DAYS_MS),
+    });
+
+    // 6. Return tokens
+    return {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    };
+  }
+
+  //Logout
+
+  async logout(refreshToken: string) {
+    const existingToken = await authRepository.findRefreshToken(refreshToken);
+
+    if (!existingToken) {
+      throw new UnauthorizedError("Invalid refresh token.");
+    }
+
+    await authRepository.deleteRefreshToken(refreshToken);
+
+    return {
+      message: "Logged out successfully.",
+    };
+  }
+
+  //logout all
+
+  async logoutAll(userId: string) {
+    const user = await authRepository.findUserById(userId);
+
+    if (!user) {
+      throw new UnauthorizedError("User not found.");
+    }
+
+    await authRepository.deleteAllRefreshTokens(user.id);
+
+    return {
+      message: "Logged out from all devices successfully.",
     };
   }
 }
