@@ -14,6 +14,8 @@ import { forgotPasswordSchema } from "../validators/forgotPassword.validator.js"
 
 import { resetPasswordSchema } from "../validators/resetPassword.validator.js";
 
+import { authenticate } from "../../../shared/middlewares/authenticate.js";
+
 const router = Router();
 
 router.post(
@@ -48,5 +50,14 @@ router.post("/refresh", authController.refreshToken.bind(authController));
 router.post("/logout", authController.logout);
 
 router.post("/logout-all", authController.logoutAll);
+
+router.get("/profile", authenticate, (req, res) => {
+  res.json({
+    success: true,
+    user: req.user,
+  });
+});
+
+router.get("/me", authenticate, authController.me);
 
 export default router;

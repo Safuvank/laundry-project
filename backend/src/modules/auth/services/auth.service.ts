@@ -20,6 +20,8 @@ import { emailService } from "../../mail/mail.module.js";
 
 import { env } from "../../../config/env.js";
 
+import { NotFoundError } from "../../../shared/errors/NotFoundErrror.js";
+
 export class AuthService {
   /*
    * REGISTER
@@ -292,6 +294,18 @@ export class AuthService {
     return {
       message: "Logged out from all devices successfully.",
     };
+  }
+
+
+  // me
+  async me(userId: string) {
+    const user = await authRepository.findUserById(userId);
+
+    if (!user) {
+      throw new NotFoundError("User not found.");
+    }
+
+    return user;
   }
 }
 
