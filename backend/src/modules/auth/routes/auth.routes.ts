@@ -16,6 +16,10 @@ import { resetPasswordSchema } from "../validators/resetPassword.validator.js";
 
 import { authenticate } from "../../../shared/middlewares/authenticate.js";
 
+import { updateProfileSchema } from "../../user/validators/updateProfile.validator.js";
+
+import { userController } from "../../user/controllers/user.controller.js";
+
 const router = Router();
 
 router.post(
@@ -59,5 +63,12 @@ router.get("/profile", authenticate, (req, res) => {
 });
 
 router.get("/me", authenticate, authController.me);
+
+router.patch(
+  "/me",
+  authenticate,
+  validateRequest(updateProfileSchema),
+  userController.updateProfile,
+);
 
 export default router;

@@ -3,8 +3,10 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 
 import authRoutes from "./modules/auth/routes/auth.routes.js";
+import userRoutes from "./modules/user/routes/user.routes.js";
 
 import { errorHandler } from "./shared/middlewares/errorHandler.js";
+
 
 const app = express();
 
@@ -34,6 +36,7 @@ app.get("/", (req, res) => {
 */
 
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", userRoutes);
 
 /*
  Global Error Handler

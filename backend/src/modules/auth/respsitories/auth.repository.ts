@@ -23,7 +23,7 @@ export class AuthRepository {
 
   async updateUser(userId: string, data: Partial<IUser>) {
     return User.findByIdAndUpdate(userId, data, {
-      new: true,
+      returnDocument: "after",
     });
   }
 

@@ -35,7 +35,13 @@ export class AuthService {
     const existingUser = await authRepository.findUserByEmail(data.email);
 
     if (existingUser) {
-      throw new ValidationError("Email already exists");
+      if (existingUser.accountStatus === "SUSPENDED") {
+        throw new ValidationError(
+          "This account has been deactivated. Please restore your account or contact support.",
+        );
+      }
+
+      throw new ValidationError("Email already exists.");
     }
 
     const hashedPassword = await hashPassword(data.password);
@@ -114,6 +120,13 @@ export class AuthService {
     if (user.accountStatus !== "ACTIVE") {
       throw new UnauthorizedError("Your account is not active.");
     }
+    // 4. Check account status
+// if (user.accountStatus === "SUSPENDED") {
+//   throw new UnauthorizedError(
+//     "Your account has been suspended. Please contact support."
+//   );
+// }
+
 
     // 5. Generate access token
     const accessToken = generateAccessToken({
@@ -295,7 +308,6 @@ export class AuthService {
       message: "Logged out from all devices successfully.",
     };
   }
-
 
   // me
   async me(userId: string) {
