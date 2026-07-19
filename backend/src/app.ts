@@ -4,6 +4,8 @@ import cookieParser from "cookie-parser";
 
 import authRoutes from "./modules/auth/routes/auth.routes.js";
 import userRoutes from "./modules/user/routes/user.routes.js";
+import addressRoutes from "./modules/address/routes/address.routes.js";
+
 
 import { errorHandler } from "./shared/middlewares/errorHandler.js";
 
@@ -37,6 +39,8 @@ app.get("/", (req, res) => {
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/addresses", addressRoutes);
+
 
 /*
  Global Error Handler
