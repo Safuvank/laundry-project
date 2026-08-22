@@ -4,6 +4,7 @@ import type { ITurnaroundPlan } from "../interfaces/ITurnaroundPlan.js";
 
 import { TurnaroundPlanCode } from "../constants/turnaroundPlanCode.js";
 import { PricingType } from "../constants/pricingType.js";
+import { PricingAdjustmentType } from "../../pricing/constants/pricingAdjustmentType.js";
 
 const turnaroundPlanSchema = new Schema<ITurnaroundPlan>(
   {
@@ -45,6 +46,12 @@ const turnaroundPlanSchema = new Schema<ITurnaroundPlan>(
       enum: Object.values(PricingType),
       required: true,
       default: PricingType.NONE,
+    },
+
+    adjustmentType: {
+      type: String,
+      enum: Object.values(PricingAdjustmentType),
+      required: true,
     },
 
     priceAdjustment: {

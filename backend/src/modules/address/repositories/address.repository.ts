@@ -1,5 +1,4 @@
 import { Types } from "mongoose";
-
 import { Address } from "../models/address.model.js";
 import type { IAddress } from "../interfaces/IAddress.js";
 
@@ -12,7 +11,7 @@ class AddressRepository {
   }
 
   /**
-   * Find address by id
+   * Find address by ID
    */
   async findById(id: string | Types.ObjectId): Promise<IAddress | null> {
     return Address.findById(id);
@@ -22,8 +21,21 @@ class AddressRepository {
    * Find all addresses of a user
    */
   async findAllByUser(userId: string | Types.ObjectId): Promise<IAddress[]> {
-    return Address.find({ userId }).sort({
+    return Address.find({
+      userId,
+    }).sort({
       isDefault: -1,
+      createdAt: -1,
+    });
+  }
+
+  /**
+   * Find all addresses
+   *
+   * Admin use
+   */
+  async findAll(): Promise<IAddress[]> {
+    return Address.find().populate("userId").sort({
       createdAt: -1,
     });
   }
@@ -99,6 +111,73 @@ class AddressRepository {
       },
       {
         returnDocument: "after",
+      },
+    );
+  }
+
+  /**
+   * Find all addresses belonging to a user
+   */
+  async findByUserId(userId: string | Types.ObjectId): Promise<IAddress[]> {
+    return Address.find({
+      userId,
+      isActive: true,
+    }).sort({
+      isDefault: -1,
+      createdAt: -1,
+    });
+  }
+
+  /**
+   * Remove default status from all user addresses
+   */
+  async clearDefault(userId: string | Types.ObjectId): Promise<void> {
+    await Address.updateMany(
+      {
+        userId,
+        isActive: true,
+      },
+      {
+        $set: {
+          isDefault: false,
+        },
+      },
+    );
+  }
+
+  /**
+   * Set an address as default
+   */
+  async setDefault(id: string | Types.ObjectId): Promise<IAddress | null> {
+    return Address.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          isDefault: true,
+        },
+      },
+      {
+        returnDocument: "after",
+        runValidators: true,
+      },
+    );
+  }
+
+  /**
+   * Deactivate address
+   */
+  async deactivate(id: string | Types.ObjectId): Promise<IAddress | null> {
+    return Address.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          isActive: false,
+          isDefault: false,
+        },
+      },
+      {
+        returnDocument: "after",
+        runValidators: true,
       },
     );
   }

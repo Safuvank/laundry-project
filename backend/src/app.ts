@@ -8,6 +8,12 @@ import addressRoutes from "./modules/address/routes/address.routes.js";
 import turnaroundPlanRoutes from "./modules/turnaroundPlan/routes/turnaroundPlan.routes.js";
 import laundryServiceRoutes from "./modules/laundryService/routes/laundryService.routes.js";
 import pricingRoutes from "./modules/pricing/routes/pricing.routes.js";
+import pickupSlotRoutes from "./modules/pickupSlot/routes/pickupSlot.routes.js";
+import orderRoutes from "./modules/order/routes/order.routes.js";
+import deliveryAgentRoutes from "./modules/deliveryAgent/routes/deliveryAgent.routes.js";
+import deliveryAssignmentRoutes from "./modules/deliveryAssignment/routes/deliveryAssignment.routes.js";
+import notificationRoutes from "./modules/notification/routes/notification.routes.js";
+import paymentRoutes from "./modules/payment/routes/payment.routes.js";
 
 import { errorHandler } from "./shared/middlewares/errorHandler.js";
 
@@ -18,9 +24,7 @@ const app = express();
 */
 
 app.use(cors());
-
 app.use(express.json());
-
 app.use(cookieParser());
 
 /*
@@ -44,6 +48,12 @@ app.use("/api/v1/addresses", addressRoutes);
 app.use("/api/v1/turnaround-plans", turnaroundPlanRoutes);
 app.use("/api/v1/laundry-services", laundryServiceRoutes);
 app.use("/api/v1/pricing", pricingRoutes);
+app.use("/api/v1/pickup-slots", pickupSlotRoutes);
+app.use("/api/v1/orders", orderRoutes);
+app.use("/api/v1/delivery-agents", deliveryAgentRoutes);
+app.use("/api/v1/delivery-assignments", deliveryAssignmentRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/payments", paymentRoutes);
 
 /*
  Global Error Handler

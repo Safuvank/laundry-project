@@ -8,13 +8,107 @@ import { EmailVerification } from "../models/emailVerification.model.js";
 
 import { PasswordReset } from "../models/passwordReset.model.js";
 
+// export class AuthRepository {
+//   async findUserByEmail(email: string) {
+//     return User.findOne({ email });
+//   }
+
+//   async findUserById(userId: string) {
+//     return User.findById(userId);
+//   }
+
+//   async createUser(userData: Partial<IUser>) {
+//     return User.create(userData);
+//   }
+
+//   async updateUser(userId: string, data: Partial<IUser>) {
+//     return User.findByIdAndUpdate(userId, data, {
+//       returnDocument: "after",
+//     });
+//   }
+
+//   /*
+// |--------------------------------------------------------------------------
+// | Refresh Tokens
+// |--------------------------------------------------------------------------
+// */
+
+//   async createRefreshToken(data: {
+//     userId: string;
+//     token: string;
+//     expiresAt: Date;
+//   }) {
+//     return RefreshToken.create(data);
+//   }
+
+//   async findRefreshToken(token: string) {
+//     return RefreshToken.findOne({
+//       token,
+//     });
+//   }
+
+//   async deleteRefreshToken(token: string) {
+//     return RefreshToken.deleteOne({
+//       token,
+//     });
+//   }
+
+//   async deleteAllRefreshTokens(userId: string) {
+//     return RefreshToken.deleteMany({
+//       userId,
+//     });
+//   }
+
+//   async createEmailVerification(data: { userId: string; token: string }) {
+//     return EmailVerification.create({
+//       ...data,
+//       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+//     });
+//   }
+
+//   async findEmailVerification(token: string) {
+//     return EmailVerification.findOne({
+//       token,
+//     });
+//   }
+
+//   async deleteEmailVerification(token: string) {
+//     return EmailVerification.deleteOne({
+//       token,
+//     });
+//   }
+
+//   async createPasswordReset(data: { userId: string; token: string }) {
+//     await PasswordReset.deleteOne({
+//       userId: data.userId,
+//     });
+
+//     return PasswordReset.create({
+//       ...data,
+//       expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+//     });
+//   }
+
+//   async findPasswordReset(token: string) {
+//     return PasswordReset.findOne({
+//       token,
+//     });
+//   }
+
+//   async deletePasswordReset(token: string) {
+//     return PasswordReset.deleteOne({
+//       token,
+//     });
+//   }
+// }
+
 export class AuthRepository {
   async findUserByEmail(email: string) {
     return User.findOne({ email });
   }
 
   async findUserById(userId: string) {
-    return User.findById(userId);
+    return User.findById(userId).select("-password");
   }
 
   async createUser(userData: Partial<IUser>) {
@@ -27,14 +121,7 @@ export class AuthRepository {
     });
   }
 
-
-
-  /*
-|--------------------------------------------------------------------------
-| Refresh Tokens
-|--------------------------------------------------------------------------
-*/
-
+  // Refresh Tokens
   async createRefreshToken(data: {
     userId: string;
     token: string;
@@ -44,23 +131,16 @@ export class AuthRepository {
   }
 
   async findRefreshToken(token: string) {
-    return RefreshToken.findOne({
-      token,
-    });
+    return RefreshToken.findOne({ token });
   }
 
   async deleteRefreshToken(token: string) {
-    return RefreshToken.deleteOne({
-      token,
-    });
+    return RefreshToken.deleteOne({ token });
   }
 
   async deleteAllRefreshTokens(userId: string) {
-    return RefreshToken.deleteMany({
-      userId,
-    });
+    return RefreshToken.deleteMany({ userId });
   }
-
 
   async createEmailVerification(data: { userId: string; token: string }) {
     return EmailVerification.create({
@@ -70,17 +150,12 @@ export class AuthRepository {
   }
 
   async findEmailVerification(token: string) {
-    return EmailVerification.findOne({
-      token,
-    });
+    return EmailVerification.findOne({ token });
   }
 
   async deleteEmailVerification(token: string) {
-    return EmailVerification.deleteOne({
-      token,
-    });
+    return EmailVerification.deleteOne({ token });
   }
-
 
   async createPasswordReset(data: { userId: string; token: string }) {
     await PasswordReset.deleteOne({
@@ -94,15 +169,11 @@ export class AuthRepository {
   }
 
   async findPasswordReset(token: string) {
-    return PasswordReset.findOne({
-      token,
-    });
+    return PasswordReset.findOne({ token });
   }
 
   async deletePasswordReset(token: string) {
-    return PasswordReset.deleteOne({
-      token,
-    });
+    return PasswordReset.deleteOne({ token });
   }
 }
 

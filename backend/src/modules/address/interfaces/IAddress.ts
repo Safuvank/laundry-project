@@ -36,6 +36,7 @@ export interface IAddress extends Document {
 
   postalCode: string;
 
+
   country: string;
 
   /*
@@ -46,6 +47,11 @@ export interface IAddress extends Document {
 
   addressType: AddressType;
 
+   location: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+
   /*
   |--------------------------------------------------------------------------
   | Default Address
@@ -53,6 +59,7 @@ export interface IAddress extends Document {
   */
 
   isDefault: boolean;
+  isActive: boolean;
 
   /*
   |--------------------------------------------------------------------------

@@ -1,0 +1,61 @@
+import { Document, Types } from "mongoose";
+
+import { DeliveryAssignmentStatus } from "../constants/deliveryAssignmentStatus.js";
+
+import { DeliveryAssignmentType } from "../constants/deliveryAssignmentType.js";
+
+export interface IDeliveryAssignment extends Document {
+  /**
+   * Order associated with this assignment
+   */
+  orderId: Types.ObjectId;
+
+  /**
+   * Delivery agent assigned to the order
+   */
+  deliveryAgentId: Types.ObjectId;
+
+  assignmentType: DeliveryAssignmentType;
+
+  /**
+   * Assignment status
+   */
+  status: DeliveryAssignmentStatus;
+
+  /**
+   * When the assignment was offered
+   */
+  offeredAt?: Date;
+
+  /**
+   * When the delivery agent accepted
+   * the assignment
+   */
+  acceptedAt?: Date;
+
+  /**
+   * When the delivery agent rejected
+   * the assignment
+   */
+  rejectedAt?: Date;
+
+  /**
+   * When the assignment was completed
+   */
+  completedAt?: Date;
+
+  /**
+   * Optional reason when an agent rejects
+   * the assignment
+   */
+  rejectionReason?: string;
+
+  /**
+   * Active / inactive assignment
+   */
+  isActive: boolean;
+
+  createdAt: Date;
+
+  updatedAt: Date;
+}

@@ -31,11 +31,24 @@ router.post(
   addressController.create,
 );
 
-// Get All Addresses
-router.get("/", addressController.getAll);
+// Get My Addresses
+router.get(
+  "/me",
+  addressController.getMyAddresses,
+);
 
-// Get Address By Id
-router.get("/:id", addressController.getById);
+// Get All Addresses
+// Admin use only
+router.get(
+  "/",
+  addressController.getAll,
+);
+
+// Get Address By ID
+router.get(
+  "/:id",
+  addressController.getById,
+);
 
 // Update Address
 router.patch(
@@ -45,9 +58,15 @@ router.patch(
 );
 
 // Delete Address
-router.delete("/:id", addressController.delete);
+router.delete(
+  "/:id",
+  addressController.delete,
+);
 
 // Set Default Address
-router.patch("/:id/default", addressController.setDefault);
+router.patch(
+  "/:id/default",
+  addressController.setDefault,
+);
 
 export default router;

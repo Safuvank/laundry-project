@@ -1,15 +1,14 @@
 import { Schema, model } from "mongoose";
 
 import type { IAddress } from "../interfaces/IAddress.js";
+
 import { AddressType } from "../constants/addresstype.js";
 
 const addressSchema = new Schema<IAddress>(
   {
-    /*
-    |--------------------------------------------------------------------------
-    | Ownership
-    |--------------------------------------------------------------------------
-    */
+    /* ---------------------------------------------------------------------- */
+    /*                               OWNERSHIP                                */
+    /* ---------------------------------------------------------------------- */
 
     userId: {
       type: Schema.Types.ObjectId,
@@ -17,11 +16,9 @@ const addressSchema = new Schema<IAddress>(
       required: true,
     },
 
-    /*
-    |--------------------------------------------------------------------------
-    | Contact Information
-    |--------------------------------------------------------------------------
-    */
+    /* ---------------------------------------------------------------------- */
+    /*                           CONTACT INFORMATION                           */
+    /* ---------------------------------------------------------------------- */
 
     fullName: {
       type: String,
@@ -35,11 +32,9 @@ const addressSchema = new Schema<IAddress>(
       trim: true,
     },
 
-    /*
-    |--------------------------------------------------------------------------
-    | Address Information
-    |--------------------------------------------------------------------------
-    */
+    /* ---------------------------------------------------------------------- */
+    /*                            ADDRESS INFORMATION                          */
+    /* ---------------------------------------------------------------------- */
 
     addressLine1: {
       type: String,
@@ -50,7 +45,6 @@ const addressSchema = new Schema<IAddress>(
     addressLine2: {
       type: String,
       trim: true,
-      default: "",
     },
 
     city: {
@@ -75,14 +69,38 @@ const addressSchema = new Schema<IAddress>(
       type: String,
       required: true,
       trim: true,
-      default: "India",
     },
 
-    /*
-    |--------------------------------------------------------------------------
-    | Address Type
-    |--------------------------------------------------------------------------
-    */
+    /* ---------------------------------------------------------------------- */
+    /*                              GEO LOCATION                              */
+    /* ---------------------------------------------------------------------- */
+
+    /**
+     * Customer address location.
+     *
+     * GeoJSON format:
+     *
+     * {
+     *   type: "Point",
+     *   coordinates: [longitude, latitude]
+     * }
+     */
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        required: true,
+      },
+
+      coordinates: {
+        type: [Number],
+        required: true,
+      },
+    },
+
+    /* ---------------------------------------------------------------------- */
+    /*                             ADDRESS TYPE                               */
+    /* ---------------------------------------------------------------------- */
 
     addressType: {
       type: String,
@@ -90,33 +108,53 @@ const addressSchema = new Schema<IAddress>(
       required: true,
     },
 
-    /*
-    |--------------------------------------------------------------------------
-    | Default Address
-    |--------------------------------------------------------------------------
-    */
+    /* ---------------------------------------------------------------------- */
+    /*                             ADDRESS STATUS                             */
+    /* ---------------------------------------------------------------------- */
 
     isDefault: {
       type: Boolean,
       default: false,
     },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
+
   {
     timestamps: true,
     versionKey: false,
   },
 );
 
-/*
-|--------------------------------------------------------------------------
-| Indexes
-|--------------------------------------------------------------------------
-*/
+/* -------------------------------------------------------------------------- */
+/*                                  INDEXES                                   */
+/* -------------------------------------------------------------------------- */
 
-// Frequently used: Get all addresses of a user
-addressSchema.index({ userId: 1 });
+/**
+ * Geospatial index.
+ *
+ * Used for location-based queries.
+ */
+addressSchema.index({
+  location: "2dsphere",
+});
 
-// Frequently used: Find the default address of a user
-addressSchema.index({ userId: 1, isDefault: 1 });
+/**
+ * Find user's addresses quickly.
+ */
+addressSchema.index({
+  userId: 1,
+});
+
+/**
+ * Find active addresses belonging to a user.
+ */
+addressSchema.index({
+  userId: 1,
+  isActive: 1,
+});
 
 export const Address = model<IAddress>("Address", addressSchema);

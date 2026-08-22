@@ -10,6 +10,10 @@ import { ValidationError } from "../../../shared/errors/ValidationError.js";
 import type { IPricingRule } from "../interfaces/IPricingRule.js";
 
 export class PricingService {
+  /* -------------------------------------------------------------------------- */
+  /*                              Private Helpers                              */
+  /* -------------------------------------------------------------------------- */
+
   /**
    * Validate Pricing Rule ID
    */
@@ -22,9 +26,7 @@ export class PricingService {
   /**
    * Get Pricing Rule or Throw Error
    */
-  private async getPricingRuleOrFail(
-    id: string,
-  ): Promise<IPricingRule> {
+  private async getPricingRuleOrFail(id: string): Promise<IPricingRule> {
     this.validateObjectId(id);
 
     const pricingRule = await pricingRepository.findById(id);
@@ -36,30 +38,63 @@ export class PricingService {
     return pricingRule;
   }
 
+  /* -------------------------------------------------------------------------- */
+  /*                              Admin APIs                                   */
+  /* -------------------------------------------------------------------------- */
+
   /**
    * Create Pricing Rule
    */
   async create(data: Partial<IPricingRule>) {
-    // Check Laundry Service
-    if (!Types.ObjectId.isValid(data.laundryServiceId?.toString())) {
+    /* ---------------------------------------------------------------------- */
+    /* Validate Laundry Service ID                                            */
+    /* ---------------------------------------------------------------------- */
+
+    if (!data.laundryServiceId) {
+      throw new ValidationError("Laundry service id is required.");
+    }
+
+    const laundryServiceId = data.laundryServiceId.toString();
+
+    if (!Types.ObjectId.isValid(laundryServiceId)) {
       throw new ValidationError("Invalid laundry service id.");
     }
 
+    /* ---------------------------------------------------------------------- */
+    /* Check Laundry Service Exists                                           */
+    /* ---------------------------------------------------------------------- */
+
     const laundryService =
-      await laundryServiceRepository.findById(
-        data.laundryServiceId!.toString(),
-      );
+      await laundryServiceRepository.findById(laundryServiceId);
 
     if (!laundryService) {
       throw new NotFoundError("Laundry service not found.");
     }
 
-    // Prevent duplicate pricing type
-    const existingRule =
-      await pricingRepository.findByLaundryServiceAndType(
-        data.laundryServiceId!.toString(),
-        data.pricingType!,
-      );
+    /* ---------------------------------------------------------------------- */
+    /* Check Laundry Service Is Active                                        */
+    /* ---------------------------------------------------------------------- */
+
+    if (!laundryService.isActive) {
+      throw new ValidationError("Laundry service is inactive.");
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Validate Pricing Type                                                  */
+    /* ---------------------------------------------------------------------- */
+
+    if (!data.pricingType) {
+      throw new ValidationError("Pricing type is required.");
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Prevent Duplicate Pricing Type                                         */
+    /* ---------------------------------------------------------------------- */
+
+    const existingRule = await pricingRepository.findByLaundryServiceAndType(
+      laundryServiceId,
+      data.pricingType,
+    );
 
     if (existingRule) {
       throw new ValidationError(
@@ -67,11 +102,16 @@ export class PricingService {
       );
     }
 
+    /* ---------------------------------------------------------------------- */
+    /* Create Pricing Rule                                                    */
+    /* ---------------------------------------------------------------------- */
+
     return pricingRepository.create(data);
   }
 
   /**
    * Customer
+   *
    * Get Active Pricing Rules
    */
   async getActivePricingRules() {
@@ -80,6 +120,7 @@ export class PricingService {
 
   /**
    * Admin
+   *
    * Get All Pricing Rules
    */
   async getAll() {
@@ -96,32 +137,37 @@ export class PricingService {
   /**
    * Update Pricing Rule
    */
-  async update(
-    id: string,
-    data: Partial<IPricingRule>,
-  ) {
-    const pricingRule =
-      await this.getPricingRuleOrFail(id);
+  async update(id: string, data: Partial<IPricingRule>) {
+    const pricingRule = await this.getPricingRuleOrFail(id);
 
-    // Prevent changing laundry service
+    /* ---------------------------------------------------------------------- */
+    /* Prevent Changing Laundry Service                                       */
+    /* ---------------------------------------------------------------------- */
+
     if (data.laundryServiceId) {
-      throw new ValidationError(
-        "Laundry service cannot be changed.",
-      );
+      throw new ValidationError("Laundry service cannot be changed.");
     }
 
-    // Prevent changing pricing type
+    /* ---------------------------------------------------------------------- */
+    /* Prevent Changing Pricing Type                                          */
+    /* ---------------------------------------------------------------------- */
+
     if (data.pricingType) {
-      throw new ValidationError(
-        "Pricing type cannot be changed.",
-      );
+      throw new ValidationError("Pricing type cannot be changed.");
     }
 
-    const updated =
-      await pricingRepository.update(
-        pricingRule.id,
-        data,
-      );
+    /* ---------------------------------------------------------------------- */
+    /* Update Pricing Rule                                                    */
+    /* ---------------------------------------------------------------------- */
+
+    const updated = await pricingRepository.update(
+      pricingRule._id.toString(),
+      data,
+    );
+
+    if (!updated) {
+      throw new NotFoundError("Pricing rule not found.");
+    }
 
     return updated;
   }
@@ -130,26 +176,35 @@ export class PricingService {
    * Activate Pricing Rule
    */
   async activate(id: string) {
-    const pricingRule =
-      await this.getPricingRuleOrFail(id);
+    const pricingRule = await this.getPricingRuleOrFail(id);
 
-    return pricingRepository.activate(
-      pricingRule.id,
+    const updated = await pricingRepository.activate(
+      pricingRule._id.toString(),
     );
+
+    if (!updated) {
+      throw new NotFoundError("Pricing rule not found.");
+    }
+
+    return updated;
   }
 
   /**
    * Deactivate Pricing Rule
    */
   async deactivate(id: string) {
-    const pricingRule =
-      await this.getPricingRuleOrFail(id);
+    const pricingRule = await this.getPricingRuleOrFail(id);
 
-    return pricingRepository.deactivate(
-      pricingRule.id,
+    const updated = await pricingRepository.deactivate(
+      pricingRule._id.toString(),
     );
+
+    if (!updated) {
+      throw new NotFoundError("Pricing rule not found.");
+    }
+
+    return updated;
   }
 }
 
-export const pricingService =
-  new PricingService();
+export const pricingService = new PricingService();

@@ -5,7 +5,29 @@ import type { IUser } from "../../auth/interfaces/IUser.js";
 export class UserRepository {
   /*
   |--------------------------------------------------------------------------
-  | Find User
+  | Create User
+  |--------------------------------------------------------------------------
+  */
+
+  async create(data: Partial<IUser>) {
+    return User.create(data);
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Find User By Email
+  |--------------------------------------------------------------------------
+  */
+
+  async findByEmail(email: string) {
+    return User.findOne({
+      email: email.toLowerCase().trim(),
+    });
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Find User By ID
   |--------------------------------------------------------------------------
   */
 
@@ -38,7 +60,7 @@ export class UserRepository {
         password,
       },
       {
-       returnDocument: "after",
+        returnDocument: "after",
       },
     );
   }
@@ -56,7 +78,7 @@ export class UserRepository {
         profileImage,
       },
       {
-       returnDocument: "after",
+        returnDocument: "after",
       },
     );
   }

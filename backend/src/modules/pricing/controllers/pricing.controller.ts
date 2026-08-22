@@ -5,6 +5,10 @@ import { asyncHandler } from "../../../shared/utils/asyncHandler.js";
 import { pricingService } from "../services/pricing.service.js";
 
 class PricingController {
+  /* -------------------------------------------------------------------------- */
+  /*                           Create Pricing Rule                              */
+  /* -------------------------------------------------------------------------- */
+
   /**
    * Create Pricing Rule
    * Admin Only
@@ -19,22 +23,27 @@ class PricingController {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*                       Get Active Pricing Rules                             */
+  /* -------------------------------------------------------------------------- */
+
   /**
    * Get Active Pricing Rules
    * Customer
    */
-  getActivePricingRules = asyncHandler(
-    async (req: Request, res: Response) => {
-      const pricingRules =
-        await pricingService.getActivePricingRules();
+  getActivePricingRules = asyncHandler(async (req: Request, res: Response) => {
+    const pricingRules = await pricingService.getActivePricingRules();
 
-      return res.status(200).json({
-        success: true,
-        message: "Pricing rules retrieved successfully.",
-        data: pricingRules,
-      });
-    },
-  );
+    return res.status(200).json({
+      success: true,
+      message: "Pricing rules retrieved successfully.",
+      data: pricingRules,
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*                              Get All Rules                                 */
+  /* -------------------------------------------------------------------------- */
 
   /**
    * Get All Pricing Rules
@@ -50,13 +59,17 @@ class PricingController {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*                            Get Rule By ID                                  */
+  /* -------------------------------------------------------------------------- */
+
   /**
-   * Get Pricing Rule By Id
+   * Get Pricing Rule By ID
    */
   getById = asyncHandler(async (req: Request, res: Response) => {
     const id = req.params.id;
 
-    if (!id) {
+    if (!id || Array.isArray(id)) {
       return res.status(400).json({
         success: false,
         message: "Pricing rule id is required.",
@@ -72,23 +85,24 @@ class PricingController {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*                            Update Rule                                     */
+  /* -------------------------------------------------------------------------- */
+
   /**
    * Update Pricing Rule
    */
   update = asyncHandler(async (req: Request, res: Response) => {
     const id = req.params.id;
 
-    if (!id) {
+    if (!id || Array.isArray(id)) {
       return res.status(400).json({
         success: false,
         message: "Pricing rule id is required.",
       });
     }
 
-    const pricingRule = await pricingService.update(
-      id,
-      req.body,
-    );
+    const pricingRule = await pricingService.update(id, req.body);
 
     return res.status(200).json({
       success: true,
@@ -97,13 +111,17 @@ class PricingController {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*                            Activate Rule                                   */
+  /* -------------------------------------------------------------------------- */
+
   /**
    * Activate Pricing Rule
    */
   activate = asyncHandler(async (req: Request, res: Response) => {
     const id = req.params.id;
 
-    if (!id) {
+    if (!id || Array.isArray(id)) {
       return res.status(400).json({
         success: false,
         message: "Pricing rule id is required.",
@@ -119,13 +137,17 @@ class PricingController {
     });
   });
 
+  /* -------------------------------------------------------------------------- */
+  /*                           Deactivate Rule                                 */
+  /* -------------------------------------------------------------------------- */
+
   /**
    * Deactivate Pricing Rule
    */
   deactivate = asyncHandler(async (req: Request, res: Response) => {
     const id = req.params.id;
 
-    if (!id) {
+    if (!id || Array.isArray(id)) {
       return res.status(400).json({
         success: false,
         message: "Pricing rule id is required.",

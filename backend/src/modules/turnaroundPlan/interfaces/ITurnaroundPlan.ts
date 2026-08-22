@@ -2,6 +2,7 @@ import type { Document } from "mongoose";
 
 import { TurnaroundPlanCode } from "../constants/turnaroundPlanCode.js";
 import { PricingType } from "../constants/pricingType.js";
+import { PricingAdjustmentType } from "../../pricing/constants/pricingAdjustmentType.js";
 
 export interface ITurnaroundPlan extends Document {
   name: string;
@@ -15,6 +16,8 @@ export interface ITurnaroundPlan extends Document {
   maxHours: number;
 
   pricingType: PricingType;
+
+  adjustmentType: PricingAdjustmentType;
 
   priceAdjustment: number;
 

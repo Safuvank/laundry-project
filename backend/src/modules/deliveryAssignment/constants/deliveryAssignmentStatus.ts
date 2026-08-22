@@ -1,0 +1,13 @@
+export enum DeliveryAssignmentStatus {
+  PENDING = "PENDING",
+
+  OFFERED = "OFFERED",
+
+  ACCEPTED = "ACCEPTED",
+
+  REJECTED = "REJECTED",
+
+  CANCELLED = "CANCELLED",
+
+  COMPLETED = "COMPLETED",
+}
