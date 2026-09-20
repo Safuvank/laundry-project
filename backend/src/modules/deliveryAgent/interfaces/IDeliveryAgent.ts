@@ -1,5 +1,3 @@
-
-
 import { Document, Types } from "mongoose";
 
 import { DeliveryAgentStatus } from "../constants/deliveryAgentStatus.js";
@@ -11,7 +9,7 @@ export interface IDeliveryAgent extends Document {
 
   phoneNumber: string;
 
-  currentLocation: {
+  currentLocation?: {
     type: "Point";
     coordinates: [number, number];
   };

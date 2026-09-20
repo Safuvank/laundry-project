@@ -101,6 +101,14 @@ class DeliveryAssignmentService {
   /**
    * Validate delivery agent
    */
+  private isAssignmentConflictError(error: unknown): boolean {
+    return (
+      error instanceof ValidationError &&
+      (error.message === "Order already has an active delivery assignment." ||
+        error.message === "Delivery agent already has an active assignment.")
+    );
+  }
+
   private async validateDeliveryAgent(deliveryAgentId: string) {
     if (!Types.ObjectId.isValid(deliveryAgentId)) {
       throw new ValidationError("Invalid delivery agent id.");
@@ -132,28 +140,34 @@ class DeliveryAssignmentService {
    *
    * The assignment starts as OFFERED.
    */
+
   async create(
     orderId: string,
     deliveryAgentId: string,
     assignmentType: DeliveryAssignmentType,
   ): Promise<IDeliveryAssignment> {
     /* ---------------------------------------------------------------------- */
-    /* Validate Order                                                         */
+    /* Validate Assignment Type                                               */
     /* ---------------------------------------------------------------------- */
+
     if (!Object.values(DeliveryAssignmentType).includes(assignmentType)) {
       throw new ValidationError("Invalid delivery assignment type.");
     }
 
+    /* ---------------------------------------------------------------------- */
+    /* Validate Order                                                         */
+    /* ---------------------------------------------------------------------- */
+
     const order = await this.validateOrder(orderId);
 
     /* ---------------------------------------------------------------------- */
-    /* Validate Delivery Agent                                               */
+    /* Validate Delivery Agent                                                */
     /* ---------------------------------------------------------------------- */
 
     const agent = await this.validateDeliveryAgent(deliveryAgentId);
 
     /* ---------------------------------------------------------------------- */
-    /* Check Existing Active Order Assignment                                */
+    /* Check Existing Active Order Assignment                                 */
     /* ---------------------------------------------------------------------- */
 
     const existingOrderAssignment =
@@ -166,7 +180,7 @@ class DeliveryAssignmentService {
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Check Existing Active Agent Assignment                                */
+    /* Check Existing Active Agent Assignment                                 */
     /* ---------------------------------------------------------------------- */
 
     const existingAgentAssignment =
@@ -179,7 +193,7 @@ class DeliveryAssignmentService {
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Create Assignment                                                     */
+    /* Create Assignment                                                      */
     /* ---------------------------------------------------------------------- */
 
     const assignment = await deliveryAssignmentRepository.create({
@@ -196,22 +210,34 @@ class DeliveryAssignmentService {
       isActive: true,
     });
 
+    /* ---------------------------------------------------------------------- */
+    /* Notify Delivery Agent                                                  */
+    /* ---------------------------------------------------------------------- */
+
     await notificationService.create({
-      userId: order.userId.toString(),
+      // IMPORTANT:
+      // The initial assignment notification goes to the delivery agent,
+      // not the customer.
+      userId: agent.userId.toString(),
+
       orderId: order._id.toString(),
+
       type:
         assignmentType === DeliveryAssignmentType.PICKUP
           ? NotificationType.PICKUP_ASSIGNED
           : NotificationType.DELIVERY_ASSIGNED,
+
       title:
         assignmentType === DeliveryAssignmentType.PICKUP
-          ? "Pickup Assignment Created"
-          : "Delivery Assignment Created",
+          ? "New Pickup Assignment"
+          : "New Delivery Assignment",
+
       message:
         assignmentType === DeliveryAssignmentType.PICKUP
-          ? "Your order has been assigned for pickup."
-          : "Your order has been assigned for delivery.",
+          ? "You have a new pickup assignment."
+          : "You have a new delivery assignment.",
     });
+
     return assignment;
   }
 
@@ -239,6 +265,8 @@ class DeliveryAssignmentService {
    */
   async createDeliveryAssignment(
     orderId: string,
+    adminLatitude: number,
+    adminLongitude: number,
   ): Promise<IDeliveryAssignment> {
     /* ---------------------------------------------------------------------- */
     /* Validate Order                                                         */
@@ -246,14 +274,30 @@ class DeliveryAssignmentService {
 
     const order = await this.validateOrder(orderId);
 
-    /* ---------------------------------------------------------------------- */
-    /* Validate Order Status                                                  */
-    /* ---------------------------------------------------------------------- */
-
     if (order.status !== OrderStatus.READY_FOR_DELIVERY) {
       throw new ValidationError(
         "Order must be READY_FOR_DELIVERY before delivery can be assigned.",
       );
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Validate Admin Location                                                */
+    /* ---------------------------------------------------------------------- */
+
+    if (
+      !Number.isFinite(adminLatitude) ||
+      adminLatitude < -90 ||
+      adminLatitude > 90
+    ) {
+      throw new ValidationError("Invalid admin latitude.");
+    }
+
+    if (
+      !Number.isFinite(adminLongitude) ||
+      adminLongitude < -180 ||
+      adminLongitude > 180
+    ) {
+      throw new ValidationError("Invalid admin longitude.");
     }
 
     /* ---------------------------------------------------------------------- */
@@ -270,87 +314,108 @@ class DeliveryAssignmentService {
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Get Customer Address                                                   */
+    /* Find Nearby Available Delivery Agents                                  */
     /* ---------------------------------------------------------------------- */
 
-    const addressId =
-      order.addressId && typeof order.addressId === "object"
-        ? order.addressId._id
-        : order.addressId;
-
-    if (!addressId) {
-      throw new ValidationError("Order address id is missing.");
-    }
-
-    const address = await addressRepository.findById(addressId.toString());
-
-    if (!address) {
-      throw new NotFoundError("Customer address not found.");
-    }
-
-    /* ---------------------------------------------------------------------- */
-    /* Validate Customer Location                                             */
-    /* ---------------------------------------------------------------------- */
-
-    const longitude = address.location.coordinates[0];
-
-    const latitude = address.location.coordinates[1];
-
-    if (longitude === undefined || latitude === undefined) {
-      throw new ValidationError("Customer address has invalid location.");
-    }
-
-    /* ---------------------------------------------------------------------- */
-    /* Find Nearby Available Delivery Agents                                 */
-    /* ---------------------------------------------------------------------- */
-
-    /**
-     * 5 km = 5000 meters
-     */
+    // MongoDB GeoJSON coordinates are [longitude, latitude].
+    // The Admin's current browser location is the search center.
     const nearbyAgents =
       await deliveryAgentRepository.findAvailableAgentsNearLocation(
-        longitude,
-        latitude,
+        adminLongitude,
+        adminLatitude,
         5000,
       );
 
+    console.log("==============================================");
+    console.log("ADMIN LOCATION DELIVERY AGENT SEARCH");
+    console.log("==============================================");
+    console.log("Admin longitude:", adminLongitude);
+    console.log("Admin latitude:", adminLatitude);
+    console.log("Search radius:", 5000, "meters");
+    console.log("Nearby available agents:", nearbyAgents.length);
+    console.log("==============================================");
+
     if (nearbyAgents.length === 0) {
       throw new ValidationError(
-        "No available delivery agent found within 5 km.",
+        "No available delivery agent found within 5 km of the admin location.",
       );
     }
 
     /* ---------------------------------------------------------------------- */
-    /* Try To Assign An Agent                                                 */
+    /* Try Agents In Nearest-First Order                                      */
     /* ---------------------------------------------------------------------- */
 
     for (const agent of nearbyAgents) {
+      let assignment: IDeliveryAssignment | null = null;
+
       try {
-        const assignment = await this.create(
+        /*
+         * create() performs a second availability check. This protects
+         * against two admins trying to assign the same agent at the same time.
+         */
+        assignment = await this.create(
           orderId,
           agent._id.toString(),
           DeliveryAssignmentType.DELIVERY,
         );
 
+        /* ------------------------------------------------------------------ */
+        /* Update Order Status                                                */
+        /* ------------------------------------------------------------------ */
+
+        const updatedOrder = await orderRepository.updateStatus(
+          orderId,
+          OrderStatus.DELIVERY_ASSIGNED,
+        );
+
+        if (!updatedOrder) {
+          throw new NotFoundError("Order not found.");
+        }
+
+        /* ------------------------------------------------------------------ */
+        /* Notify Customer                                                     */
+        /* ------------------------------------------------------------------ */
+
+        await notificationService.create({
+          userId: updatedOrder.userId.toString(),
+          orderId: updatedOrder._id.toString(),
+          type: NotificationType.DELIVERY_ASSIGNED,
+          title: "Delivery Assigned",
+          message: "A delivery agent has been assigned to your order.",
+        });
+
         return assignment;
       } catch (error) {
         /*
-         * Another request may have assigned this agent
-         * between finding the agent and creating the assignment.
-         *
-         * Try the next available agent.
+         * If this candidate lost a race with another request, try the next
+         * available agent. Do not swallow unrelated ValidationErrors.
          */
-        if (error instanceof ValidationError) {
+        if (this.isAssignmentConflictError(error)) {
           continue;
+        }
+
+        /*
+         * create() may already have created the assignment before a later
+         * operation failed. Clean it up so we never leave a stale OFFERED
+         * assignment behind.
+         */
+        if (assignment) {
+          try {
+            await deliveryAssignmentRepository.update(assignment._id, {
+              status: DeliveryAssignmentStatus.CANCELLED,
+              isActive: false,
+            });
+          } catch (cleanupError) {
+            console.error(
+              "Failed to clean up delivery assignment after error:",
+              cleanupError,
+            );
+          }
         }
 
         throw error;
       }
     }
-
-    /* ---------------------------------------------------------------------- */
-    /* No Agent Could Be Assigned                                             */
-    /* ---------------------------------------------------------------------- */
 
     throw new ValidationError(
       "Unable to assign a delivery agent. Please try again.",
@@ -465,9 +530,32 @@ class DeliveryAssignmentService {
       throw new ValidationError("Delivery agent is no longer available.");
     }
 
+    /*
+     * DELIVERY assignments are offered while the order is still
+     * READY_FOR_DELIVERY. The order becomes DELIVERY_ASSIGNED when the
+     * delivery agent accepts the offer.
+     */
+    const order = await orderRepository.findById(
+      assignment.orderId.toString(),
+    );
+
+    if (!order) {
+      throw new NotFoundError("Order not found.");
+    }
+
+    if (assignment.assignmentType === DeliveryAssignmentType.DELIVERY) {
+      if (
+        order.status !== OrderStatus.READY_FOR_DELIVERY &&
+        order.status !== OrderStatus.DELIVERY_ASSIGNED
+      ) {
+        throw new ValidationError(
+          "Order must be READY_FOR_DELIVERY before a delivery assignment can be accepted.",
+        );
+      }
+    }
+
     const updated = await deliveryAssignmentRepository.update(assignment._id, {
       status: DeliveryAssignmentStatus.ACCEPTED,
-
       acceptedAt: new Date(),
     });
 
@@ -475,49 +563,69 @@ class DeliveryAssignmentService {
       throw new NotFoundError("Delivery assignment not found.");
     }
 
-    await deliveryAgentRepository.updateStatus(
-      assignment.deliveryAgentId.toString(),
-      DeliveryAgentStatus.BUSY,
-    );
+    try {
+      await deliveryAgentRepository.updateStatus(
+        assignment.deliveryAgentId.toString(),
+        DeliveryAgentStatus.BUSY,
+      );
 
-    const nextOrderStatus =
-      assignment.assignmentType === DeliveryAssignmentType.PICKUP
-        ? OrderStatus.PICKUP_ASSIGNED
-        : OrderStatus.DELIVERY_ASSIGNED;
+      const updatedOrder =
+        assignment.assignmentType === DeliveryAssignmentType.PICKUP
+          ? await orderRepository.updateStatus(
+              assignment.orderId.toString(),
+              OrderStatus.PICKUP_ASSIGNED,
+            )
+          : order.status === OrderStatus.READY_FOR_DELIVERY
+            ? await orderRepository.updateStatus(
+                assignment.orderId.toString(),
+                OrderStatus.DELIVERY_ASSIGNED,
+              )
+            : order;
 
-    const updatedOrder = await orderRepository.updateStatus(
-      assignment.orderId.toString(),
-      nextOrderStatus,
-    );
+      if (!updatedOrder) {
+        throw new NotFoundError("Order not found.");
+      }
 
-    if (!updatedOrder) {
-      throw new NotFoundError("Order not found.");
+      const result = await deliveryAssignmentRepository.findById(updated._id);
+
+      if (!result) {
+        throw new NotFoundError("Delivery assignment not found.");
+      }
+
+      if (assignment.assignmentType === DeliveryAssignmentType.PICKUP) {
+        await notificationService.create({
+          userId: updatedOrder.userId.toString(),
+          orderId: updatedOrder._id.toString(),
+          type: NotificationType.PICKUP_ASSIGNED,
+          title: "Pickup Assigned",
+          message: "A delivery agent has accepted your pickup assignment.",
+        });
+      }
+
+      return result;
+    } catch (error) {
+      // Keep assignment/agent state consistent if a later step fails.
+      try {
+        await deliveryAssignmentRepository.update(assignment._id, {
+          status: DeliveryAssignmentStatus.OFFERED,
+        });
+
+        await deliveryAssignmentRepository.unsetFields(assignment._id, [
+          "acceptedAt",
+        ]);
+        await deliveryAgentRepository.updateStatus(
+          assignment.deliveryAgentId.toString(),
+          DeliveryAgentStatus.AVAILABLE,
+        );
+      } catch (rollbackError) {
+        console.error(
+          "Failed to rollback assignment acceptance:",
+          rollbackError,
+        );
+      }
+
+      throw error;
     }
-
-    const result = await deliveryAssignmentRepository.findById(updated._id);
-
-    if (!result) {
-      throw new NotFoundError("Delivery assignment not found.");
-    }
-
-    await notificationService.create({
-      userId: updatedOrder.userId.toString(),
-      orderId: updatedOrder._id.toString(),
-      type:
-        assignment.assignmentType === DeliveryAssignmentType.PICKUP
-          ? NotificationType.PICKUP_ASSIGNED
-          : NotificationType.DELIVERY_ASSIGNED,
-      title:
-        assignment.assignmentType === DeliveryAssignmentType.PICKUP
-          ? "Pickup Assigned"
-          : "Delivery Assigned",
-      message:
-        assignment.assignmentType === DeliveryAssignmentType.PICKUP
-          ? "A delivery agent has accepted your pickup assignment."
-          : "A delivery agent has accepted your delivery assignment.",
-    });
-    return result;
-    // return updated;
   }
 
   /* -------------------------------------------------------------------------- */
@@ -535,7 +643,7 @@ class DeliveryAssignmentService {
    * 4. Create a new OFFERED assignment
    *
    * If no agent is available:
-   * The order remains BOOKED.
+   * The order remains in its current assignment state.
    */
   async reject(
     id: string,
@@ -667,7 +775,7 @@ class DeliveryAssignmentService {
          *
          * Try the next nearest agent.
          */
-        if (error instanceof ValidationError) {
+        if (this.isAssignmentConflictError(error)) {
           continue;
         }
 
@@ -682,7 +790,7 @@ class DeliveryAssignmentService {
     /**
      * No nearby agent is currently available.
      *
-     * The order remains BOOKED.
+     * The order remains in its current assignment state.
      *
      * We return the rejected assignment because
      * there is no new assignment to return.
@@ -769,6 +877,22 @@ class DeliveryAssignmentService {
     }
 
     /* ---------------------------------------------------------------------- */
+    /* Update Assignment Status                                               */
+    /* ---------------------------------------------------------------------- */
+
+    const updatedAssignmentStatus = await deliveryAssignmentRepository.update(
+      assignment._id,
+      {
+        status: DeliveryAssignmentStatus.IN_PROGRESS,
+        startedAt: new Date(),
+      },
+    );
+
+    if (!updatedAssignmentStatus) {
+      throw new NotFoundError("Delivery assignment not found.");
+    }
+
+    /* ---------------------------------------------------------------------- */
     /* Return Updated Assignment                                             */
     /* ---------------------------------------------------------------------- */
 
@@ -833,8 +957,10 @@ class DeliveryAssignmentService {
     /* Assignment Must Be Accepted                                            */
     /* ---------------------------------------------------------------------- */
 
-    if (assignment.status !== DeliveryAssignmentStatus.ACCEPTED) {
-      throw new ValidationError("Only accepted assignments can be completed.");
+    if (assignment.status !== DeliveryAssignmentStatus.IN_PROGRESS) {
+      throw new ValidationError(
+        "Only in-progress assignments can be completed.",
+      );
     }
 
     /* ---------------------------------------------------------------------- */
@@ -1059,6 +1185,22 @@ class DeliveryAssignmentService {
     }
 
     /* ---------------------------------------------------------------------- */
+    /* Validate Order Status                                                  */
+    /* ---------------------------------------------------------------------- */
+
+    const order = await orderRepository.findById(assignment.orderId.toString());
+
+    if (!order) {
+      throw new NotFoundError("Order not found.");
+    }
+
+    if (order.status !== OrderStatus.PICKUP_ASSIGNED) {
+      throw new ValidationError(
+        "Order must be PICKUP_ASSIGNED before starting pickup.",
+      );
+    }
+
+    /* ---------------------------------------------------------------------- */
     /* Update Order Status                                                   */
     /* ---------------------------------------------------------------------- */
 
@@ -1069,6 +1211,22 @@ class DeliveryAssignmentService {
 
     if (!updatedOrder) {
       throw new NotFoundError("Order not found.");
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Update Assignment Status                                               */
+    /* ---------------------------------------------------------------------- */
+
+    const updatedAssignmentStatus = await deliveryAssignmentRepository.update(
+      assignment._id,
+      {
+        status: DeliveryAssignmentStatus.IN_PROGRESS,
+        startedAt: new Date(),
+      },
+    );
+
+    if (!updatedAssignmentStatus) {
+      throw new NotFoundError("Delivery assignment not found.");
     }
 
     /* ---------------------------------------------------------------------- */

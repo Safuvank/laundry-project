@@ -12,7 +12,7 @@ class DeliveryAssignmentRepository {
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Create a delivery assignment
+   * Create a delivery assignment.
    */
   async create(
     data: Partial<IDeliveryAssignment>,
@@ -21,39 +21,39 @@ class DeliveryAssignmentRepository {
   }
 
   /* -------------------------------------------------------------------------- */
-/*                                FIND BY ID                                  */
-/* -------------------------------------------------------------------------- */
+  /*                                FIND BY ID                                  */
+  /* -------------------------------------------------------------------------- */
 
-/**
- * Find assignment by ID
- *
- * Used internally by service/business logic.
- */
-async findById(
-  id: string | Types.ObjectId,
-): Promise<IDeliveryAssignment | null> {
-  return DeliveryAssignment.findById(id);
-}
+  /**
+   * Find assignment by ID.
+   *
+   * Used internally by service/business logic.
+   */
+  async findById(
+    id: string | Types.ObjectId,
+  ): Promise<IDeliveryAssignment | null> {
+    return DeliveryAssignment.findById(id);
+  }
 
-/**
- * Find assignment by ID with populated references
- *
- * Used for detailed API responses.
- */
-async findByIdPopulated(
-  id: string | Types.ObjectId,
-): Promise<IDeliveryAssignment | null> {
-  return DeliveryAssignment.findById(id)
-    .populate("orderId")
-    .populate("deliveryAgentId");
-}
+  /**
+   * Find assignment by ID with populated references.
+   *
+   * Used for detailed API responses.
+   */
+  async findByIdPopulated(
+    id: string | Types.ObjectId,
+  ): Promise<IDeliveryAssignment | null> {
+    return DeliveryAssignment.findById(id)
+      .populate("orderId")
+      .populate("deliveryAgentId");
+  }
 
   /* -------------------------------------------------------------------------- */
   /*                            FIND BY ORDER ID                                */
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Find all assignments for an order
+   * Find all assignments for an order.
    */
   async findByOrderId(
     orderId: string | Types.ObjectId,
@@ -72,7 +72,7 @@ async findByIdPopulated(
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Find the active assignment for an order
+   * Find the active assignment for an order.
    */
   async findActiveByOrderId(
     orderId: string | Types.ObjectId,
@@ -90,7 +90,10 @@ async findByIdPopulated(
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Find all assignments for a delivery agent
+   * Find all assignments for a delivery agent.
+   *
+   * The order's address is populated because the delivery dashboard
+   * needs the customer's location for pickup/delivery information.
    */
   async findByAgentId(
     deliveryAgentId: string | Types.ObjectId,
@@ -98,7 +101,12 @@ async findByIdPopulated(
     return DeliveryAssignment.find({
       deliveryAgentId,
     })
-      .populate("orderId")
+      .populate({
+        path: "orderId",
+        populate: {
+          path: "addressId",
+        },
+      })
       .sort({
         createdAt: -1,
       });
@@ -109,7 +117,7 @@ async findByIdPopulated(
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Find active assignment for a delivery agent
+   * Find active assignment for a delivery agent.
    */
   async findActiveByAgentId(
     deliveryAgentId: string | Types.ObjectId,
@@ -127,7 +135,7 @@ async findByIdPopulated(
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Find assignments by status
+   * Find assignments by status.
    */
   async findByStatus(
     status: DeliveryAssignmentStatus,
@@ -147,7 +155,7 @@ async findByIdPopulated(
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Find all active assignments
+   * Find all active assignments.
    */
   async findAllActive(): Promise<IDeliveryAssignment[]> {
     return DeliveryAssignment.find({
@@ -165,7 +173,7 @@ async findByIdPopulated(
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Update assignment
+   * Update assignment.
    */
   async update(
     id: string | Types.ObjectId,
@@ -188,7 +196,7 @@ async findByIdPopulated(
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Update assignment status
+   * Update assignment status.
    */
   async updateStatus(
     id: string | Types.ObjectId,
@@ -213,7 +221,7 @@ async findByIdPopulated(
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Activate assignment
+   * Activate assignment.
    */
   async activate(
     id: string | Types.ObjectId,
@@ -233,11 +241,40 @@ async findByIdPopulated(
   }
 
   /* -------------------------------------------------------------------------- */
+  /*                              UNSET FIELDS                                 */
+  /* -------------------------------------------------------------------------- */
+
+  /**
+   * Remove fields from an assignment document.
+   *
+   * Useful when rolling back an accepted assignment and
+   * removing timestamps such as acceptedAt.
+   */
+  async unsetFields(
+    id: string | Types.ObjectId,
+    fields: string[],
+  ): Promise<IDeliveryAssignment | null> {
+    return DeliveryAssignment.findByIdAndUpdate(
+      id,
+      {
+        $unset: fields.reduce<Record<string, 1>>((acc, field) => {
+          acc[field] = 1;
+          return acc;
+        }, {}),
+      },
+      {
+        returnDocument: "after",
+        runValidators: true,
+      },
+    );
+  }
+
+  /* -------------------------------------------------------------------------- */
   /*                                DEACTIVATE                                */
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Deactivate assignment
+   * Deactivate assignment.
    */
   async deactivate(
     id: string | Types.ObjectId,
@@ -255,6 +292,20 @@ async findByIdPopulated(
       },
     );
   }
+
+  /* -------------------------------------------------------------------------- */
+  /*                       FIND AVAILABLE NEAR LOCATION                         */
+  /* -------------------------------------------------------------------------- */
+
+  /**
+   * This repository is intentionally focused on assignment persistence.
+   *
+   * Nearby-agent lookup belongs to DeliveryAgentRepository because the
+   * geospatial query is performed against DeliveryAgent.currentLocation.
+   *
+   * DeliveryAssignmentService calls:
+   * deliveryAgentRepository.findAvailableAgentsNearLocation(...)
+   */
 }
 
 export const deliveryAssignmentRepository = new DeliveryAssignmentRepository();

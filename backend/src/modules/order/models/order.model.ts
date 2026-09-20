@@ -27,6 +27,27 @@ const orderSchema = new Schema<IOrder>(
     },
 
     /**
+     * Customer Pickup Location
+     *
+     * Location captured from the customer's browser
+     * at the time of booking.
+     *
+     * GeoJSON coordinates:
+     * [longitude, latitude]
+     */
+    pickupLocation: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        required: true,
+      },
+      coordinates: {
+        type: [Number],
+        required: true,
+      },
+    },
+
+    /**
      * Turnaround Plan
      */
     turnaroundPlanId: {
@@ -185,6 +206,17 @@ orderSchema.index({
  */
 orderSchema.index({
   isActive: 1,
+});
+
+/**
+ * Customer Pickup Location
+ *
+ * Used for geospatial queries such as:
+ * Find delivery agents within 5 km
+ * of the customer's pickup location.
+ */
+orderSchema.index({
+  pickupLocation: "2dsphere",
 });
 
 export const Order = model<IOrder>(

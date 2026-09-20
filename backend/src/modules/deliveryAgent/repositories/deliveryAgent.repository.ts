@@ -43,6 +43,7 @@ class DeliveryAgentRepository {
       userId,
     }).populate("userId", "-password");
   }
+
   /* -------------------------------------------------------------------------- */
   /*                                FIND ALL                                    */
   /* -------------------------------------------------------------------------- */
@@ -55,6 +56,7 @@ class DeliveryAgentRepository {
       createdAt: -1,
     });
   }
+
   /* -------------------------------------------------------------------------- */
   /*                           FIND ALL ACTIVE                                  */
   /* -------------------------------------------------------------------------- */
@@ -104,13 +106,24 @@ class DeliveryAgentRepository {
    *
    * Example:
    * 5 km = 5000 meters
+   *
+   * Coordinates must be:
+   * [longitude, latitude]
    */
   async findAvailableAgentsNearLocation(
     longitude: number,
     latitude: number,
     radiusInMeters: number,
   ): Promise<IDeliveryAgent[]> {
-    return DeliveryAgent.find({
+    console.log("==============================================");
+    console.log("🔎 NEARBY DELIVERY AGENT SEARCH");
+    console.log("==============================================");
+
+    console.log("Search longitude:", longitude);
+    console.log("Search latitude:", latitude);
+    console.log("Search radius:", radiusInMeters, "meters");
+
+    const agents = await DeliveryAgent.find({
       isActive: true,
 
       status: DeliveryAgentStatus.AVAILABLE,
@@ -125,6 +138,32 @@ class DeliveryAgentRepository {
         },
       },
     }).populate("userId", "-password");
+
+    console.log("🚚 Nearby available agents found:", agents.length);
+
+    if (agents.length > 0) {
+      console.log(
+        "🚚 Nearby agents:",
+        agents.map((agent) => ({
+          id: agent._id.toString(),
+          userId: agent.userId,
+          status: agent.status,
+          isActive: agent.isActive,
+          currentLocation: agent.currentLocation,
+        })),
+      );
+    } else {
+      console.log("❌ No available delivery agents found within radius.");
+
+      console.log("Expected conditions:");
+      console.log("  isActive =", true);
+      console.log("  status =", DeliveryAgentStatus.AVAILABLE);
+      console.log("  radius =", radiusInMeters, "meters");
+    }
+
+    console.log("==============================================");
+
+    return agents;
   }
 
   /* -------------------------------------------------------------------------- */
@@ -254,3 +293,5 @@ class DeliveryAgentRepository {
 }
 
 export const deliveryAgentRepository = new DeliveryAgentRepository();
+
+

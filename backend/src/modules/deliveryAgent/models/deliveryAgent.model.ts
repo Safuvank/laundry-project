@@ -46,12 +46,10 @@ const deliveryAgentSchema = new Schema<IDeliveryAgent>(
       type: {
         type: String,
         enum: ["Point"],
-        required: true,
       },
 
       coordinates: {
         type: [Number],
-        required: true,
       },
     },
 
@@ -75,26 +73,20 @@ const deliveryAgentSchema = new Schema<IDeliveryAgent>(
 /*                                  Indexes                                   */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Find agents by status
- */
 deliveryAgentSchema.index({
   status: 1,
 });
 
-/**
- * Find active agents by status
- */
 deliveryAgentSchema.index({
   isActive: 1,
   status: 1,
 });
 
 /**
- * Geospatial index
+ * Geospatial index.
  *
- * Used to find delivery agents
- * within a particular distance.
+ * Only delivery agents that have a valid currentLocation
+ * can participate in nearby-location searches.
  */
 deliveryAgentSchema.index({
   currentLocation: "2dsphere",

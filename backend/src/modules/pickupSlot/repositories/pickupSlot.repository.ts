@@ -44,10 +44,31 @@ class PickupSlotRepository {
 
   /**
    * Find Pickup Slots By Date
+   *
+   * Searches the complete UTC calendar day.
+   *
+   * Example:
+   * 2026-09-20
+   *
+   * searches:
+   * 2026-09-20T00:00:00.000Z
+   * →
+   * 2026-09-20T23:59:59.999Z
    */
   async findByDate(date: Date): Promise<IPickupSlot[]> {
+    const startOfDay = new Date(date);
+
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
     return PickupSlot.find({
-      date,
+      date: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
       isActive: true,
     }).sort({
       startTime: 1,
@@ -84,6 +105,9 @@ class PickupSlotRepository {
 
   /**
    * Increment Booked Count
+   *
+   * Atomically increments bookedCount only when
+   * the slot is active, available, and not full.
    */
   async incrementBookedCount(id: string): Promise<IPickupSlot | null> {
     return PickupSlot.findOneAndUpdate(

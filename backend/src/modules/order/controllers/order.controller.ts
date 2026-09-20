@@ -1,17 +1,99 @@
 import type { Request, Response } from "express";
 
 import { asyncHandler } from "../../../shared/utils/asyncHandler.js";
-
 import { ValidationError } from "../../../shared/errors/ValidationError.js";
 
+import { OrderStatus } from "../constants/orderStatus.js";
+import { PaymentStatus } from "../constants/paymentStatus.js";
 import { orderService } from "../services/order.service.js";
 
 class OrderController {
   /**
    * Create Order
+   *
+   * Customer sends:
+   * - addressId
+   * - turnaroundPlanId
+   * - laundryServiceIds
+   * - pickupSlotId
+   * - pickupLocation
+   * - preferences
+   *
+   * pickupLocation is captured from the customer's
+   * browser at booking time.
+   *
+   * Expected format:
+   *
+   * {
+   *   latitude: number,
+   *   longitude: number
+   * }
    */
   create = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user.userId;
+
+    const { pickupLocation } = req.body;
+
+    // ---------------------------------------------------------------
+    // Validate pickup location exists
+    // ---------------------------------------------------------------
+
+    if (!pickupLocation) {
+      throw new ValidationError(
+        "Pickup location is required to create an order.",
+      );
+    }
+
+    // ---------------------------------------------------------------
+    // Validate pickup location structure
+    // ---------------------------------------------------------------
+
+    if (typeof pickupLocation !== "object" || Array.isArray(pickupLocation)) {
+      throw new ValidationError("Invalid pickup location.");
+    }
+
+    const { latitude, longitude } = pickupLocation;
+
+    // ---------------------------------------------------------------
+    // Validate latitude
+    // ---------------------------------------------------------------
+
+    if (
+      typeof latitude !== "number" ||
+      !Number.isFinite(latitude) ||
+      latitude < -90 ||
+      latitude > 90
+    ) {
+      throw new ValidationError("Invalid pickup latitude.");
+    }
+
+    // ---------------------------------------------------------------
+    // Validate longitude
+    // ---------------------------------------------------------------
+
+    if (
+      typeof longitude !== "number" ||
+      !Number.isFinite(longitude) ||
+      longitude < -180 ||
+      longitude > 180
+    ) {
+      throw new ValidationError("Invalid pickup longitude.");
+    }
+
+    // ---------------------------------------------------------------
+    // Development debugging
+    // ---------------------------------------------------------------
+    // Remove this log in production because location data
+    // should not be unnecessarily written to application logs.
+
+    console.log("CREATE ORDER PICKUP LOCATION:", {
+      latitude,
+      longitude,
+    });
+
+    // ---------------------------------------------------------------
+    // Create order
+    // ---------------------------------------------------------------
 
     const order = await orderService.create(userId, req.body);
 
@@ -94,6 +176,9 @@ class OrderController {
 
   /**
    * Update Order Status
+   *
+   * Validates that the received status is one of the
+   * supported OrderStatus values before calling the service.
    */
   updateStatus = asyncHandler(async (req: Request, res: Response) => {
     const orderId = req.params.id;
@@ -104,7 +189,22 @@ class OrderController {
 
     const { status } = req.body;
 
-    const order = await orderService.updateStatus(orderId, status);
+    if (!status || typeof status !== "string") {
+      throw new ValidationError("Order status is required.");
+    }
+
+    // ---------------------------------------------------------------
+    // Validate OrderStatus enum value
+    // ---------------------------------------------------------------
+
+    if (!Object.values(OrderStatus).includes(status as OrderStatus)) {
+      throw new ValidationError("Invalid order status.");
+    }
+
+    const order = await orderService.updateStatus(
+      orderId,
+      status as OrderStatus,
+    );
 
     return res.status(200).json({
       success: true,
@@ -313,6 +413,11 @@ class OrderController {
 
   /**
    * Update Pricing
+   *
+   * Body:
+   * {
+   *   finalPrice: number
+   * }
    */
   updatePricing = asyncHandler(async (req: Request, res: Response) => {
     const orderId = req.params.id;
@@ -322,6 +427,14 @@ class OrderController {
     }
 
     const { finalPrice } = req.body;
+
+    if (typeof finalPrice !== "number" || !Number.isFinite(finalPrice)) {
+      throw new ValidationError("Final price must be a valid number.");
+    }
+
+    if (finalPrice < 0) {
+      throw new ValidationError("Final price cannot be negative.");
+    }
 
     const order = await orderService.updatePricing(orderId, finalPrice);
 
@@ -334,6 +447,11 @@ class OrderController {
 
   /**
    * Update Payment Status
+   *
+   * Body:
+   * {
+   *   paymentStatus: PaymentStatus
+   * }
    */
   updatePaymentStatus = asyncHandler(async (req: Request, res: Response) => {
     const orderId = req.params.id;
@@ -344,14 +462,28 @@ class OrderController {
 
     const { paymentStatus } = req.body;
 
+    if (!paymentStatus || typeof paymentStatus !== "string") {
+      throw new ValidationError("Payment status is required.");
+    }
+
+    // ---------------------------------------------------------------
+    // Validate PaymentStatus enum value
+    // ---------------------------------------------------------------
+
+    if (
+      !Object.values(PaymentStatus).includes(paymentStatus as PaymentStatus)
+    ) {
+      throw new ValidationError("Invalid payment status.");
+    }
+
     const order = await orderService.updatePaymentStatus(
       orderId,
-      paymentStatus,
+      paymentStatus as PaymentStatus,
     );
 
     return res.status(200).json({
       success: true,
-      message: "Payment status updated successfully.",
+      message: "Order payment status updated successfully.",
       data: order,
     });
   });

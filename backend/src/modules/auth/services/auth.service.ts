@@ -1,3 +1,5 @@
+import jwt from "jsonwebtoken";
+
 import { authRepository } from "../respsitories/auth.repository.js";
 
 import { hashPassword, comparePassword } from "../utils/hash.js";
@@ -13,8 +15,6 @@ import { generateToken } from "../utils/tokens.js";
 import { ValidationError } from "../../../shared/errors/ValidationError.js";
 
 import { UnauthorizedError } from "../../../shared/errors/UnauthorizedError.js";
-
-import { EmailVerification } from "../models/emailVerification.model.js";
 
 import { emailService } from "../../mail/mail.module.js";
 
@@ -72,7 +72,9 @@ export class AuthService {
     };
   }
 
-  // verify email
+  /*
+   * VERIFY EMAIL
+   */
   async verifyEmail(token: string) {
     const verification = await authRepository.findEmailVerification(token);
 
@@ -95,67 +97,79 @@ export class AuthService {
    * LOGIN
    */
   async login(email: string, password: string) {
-    // 1. Find user
-    const user = await authRepository.findUserByEmail(email);
+    console.log("🔐 LOGIN ATTEMPT:", email);
+
+    const user = await authRepository.findUserByEmailForLogin(email);
+
+    console.log("👤 USER FOUND:", !!user);
 
     if (!user) {
+      console.log("❌ USER NOT FOUND");
       throw new UnauthorizedError("Invalid email or password.");
     }
 
-    // 2. Compare password
     const isPasswordValid = await comparePassword(password, user.password);
+
+    console.log("🔑 PASSWORD VALID:", isPasswordValid);
+    console.log("📧 EMAIL VERIFIED:", user.isEmailVerified);
+    console.log("🟢 ACCOUNT STATUS:", user.accountStatus);
 
     if (!isPasswordValid) {
       throw new UnauthorizedError("Invalid email or password.");
     }
 
-    // 3. Check email verification
     if (!user.isEmailVerified) {
+      console.log("❌ EMAIL NOT VERIFIED");
+
       throw new UnauthorizedError(
         "Please verify your email before logging in.",
       );
     }
 
-    // 4. Check account status
     if (user.accountStatus !== "ACTIVE") {
+      console.log("❌ ACCOUNT NOT ACTIVE");
+
       throw new UnauthorizedError("Your account is not active.");
     }
-    // 4. Check account status
-// if (user.accountStatus === "SUSPENDED") {
-//   throw new UnauthorizedError(
-//     "Your account has been suspended. Please contact support."
-//   );
-// }
 
-
-    // 5. Generate access token
     const accessToken = generateAccessToken({
       userId: user.id,
       role: user.role,
     });
 
-    // 6. Generate refresh token
     const refreshToken = generateRefreshToken({
       userId: user.id,
     });
 
-    // 7. Store refresh token
     await authRepository.createRefreshToken({
       userId: user.id,
       token: refreshToken,
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     });
 
-    // 8. Update last login
     await authRepository.updateUser(user.id, {
       lastLoginAt: new Date(),
     });
 
-    // 9. Return data
+    const safeUser = {
+      _id: user._id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      role: user.role,
+      isEmailVerified: user.isEmailVerified,
+      accountStatus: user.accountStatus,
+      profileImage: user.profileImage,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+
     return {
       accessToken,
       refreshToken,
-      user,
+      user: safeUser,
     };
   }
 
@@ -163,36 +177,29 @@ export class AuthService {
    * FORGOT PASSWORD
    */
   async forgotPassword(email: string) {
-    // 1. Find the user
     const user = await authRepository.findUserByEmail(email);
 
-    // 2. Prevent email enumeration
     if (!user) {
       return {
         message: "If an account exists, a password reset email has been sent.",
       };
     }
 
-    // 3. Generate reset token
     const resetToken = generateToken();
 
-    // 4. Store reset token
     await authRepository.createPasswordReset({
       userId: user.id,
       token: resetToken,
     });
 
-    // 5. Generate reset URL
     const resetPasswordUrl = `${env.FRONTEND_URL}/reset-password?token=${resetToken}`;
 
-    // 6. Send reset email
     await emailService.sendForgotPasswordEmail({
       firstName: user.firstName,
       email: user.email,
       resetPasswordUrl,
     });
 
-    // 7. Return success
     return {
       message: "If an account exists, a password reset email has been sent.",
     };
@@ -202,27 +209,22 @@ export class AuthService {
    * RESET PASSWORD
    */
   async resetPassword(token: string, password: string) {
-    // Find reset token
     const passwordReset = await authRepository.findPasswordReset(token);
 
     if (!passwordReset) {
       throw new ValidationError("Invalid or expired reset token");
     }
 
-    // Check expiration
     if (passwordReset.expiresAt < new Date()) {
       throw new ValidationError("Reset link has expired");
     }
 
-    // Hash password
     const hashedPassword = await hashPassword(password);
 
-    // Update user
     await authRepository.updateUser(passwordReset.userId.toString(), {
       password: hashedPassword,
     });
 
-    // Delete reset token
     await authRepository.deletePasswordReset(token);
 
     return {
@@ -230,26 +232,68 @@ export class AuthService {
     };
   }
 
-  //refresh token
+  /*
+   * REFRESH TOKEN
+   */
   async refreshToken(refreshToken: string) {
-    // 1. Verify JWT
-    verifyRefreshToken(refreshToken);
+    /* ---------------------------------------------------------------------- */
+    /*                         VALIDATE TOKEN                                  */
+    /* ---------------------------------------------------------------------- */
 
-    // 2. Find active session
+    if (!refreshToken) {
+      throw new UnauthorizedError("Refresh token is required.");
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /*                         VERIFY JWT                                     */
+    /* ---------------------------------------------------------------------- */
+
+    try {
+      verifyRefreshToken(refreshToken);
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new UnauthorizedError("Refresh token has expired.");
+      }
+
+      if (error instanceof jwt.JsonWebTokenError) {
+        throw new UnauthorizedError("Invalid refresh token.");
+      }
+
+      throw error;
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /*                    FIND ACTIVE SESSION                                 */
+    /* ---------------------------------------------------------------------- */
+
     const session = await authRepository.findRefreshToken(refreshToken);
 
     if (!session) {
-      throw new UnauthorizedError("Invalid refresh token");
+      throw new UnauthorizedError("Invalid refresh token.");
     }
 
-    // 3. Find user
+    /* ---------------------------------------------------------------------- */
+    /*                         FIND USER                                      */
+    /* ---------------------------------------------------------------------- */
+
     const user = await authRepository.findUserById(session.userId.toString());
 
     if (!user) {
-      throw new UnauthorizedError("User not found");
+      throw new UnauthorizedError("User not found.");
     }
 
-    // 4. Generate new tokens
+    /* ---------------------------------------------------------------------- */
+    /*                     CHECK ACCOUNT STATUS                               */
+    /* ---------------------------------------------------------------------- */
+
+    if (user.accountStatus !== "ACTIVE") {
+      throw new UnauthorizedError("Account is inactive.");
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /*                       GENERATE TOKENS                                  */
+    /* ---------------------------------------------------------------------- */
+
     const newAccessToken = generateAccessToken({
       userId: user.id,
       role: user.role,
@@ -259,7 +303,10 @@ export class AuthService {
       userId: user.id,
     });
 
-    // 5. Rotate refresh token
+    /* ---------------------------------------------------------------------- */
+    /*                     ROTATE REFRESH TOKEN                               */
+    /* ---------------------------------------------------------------------- */
+
     await authRepository.deleteRefreshToken(refreshToken);
 
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -270,15 +317,19 @@ export class AuthService {
       expiresAt: new Date(Date.now() + THIRTY_DAYS_MS),
     });
 
-    // 6. Return tokens
+    /* ---------------------------------------------------------------------- */
+    /*                           RETURN TOKENS                                */
+    /* ---------------------------------------------------------------------- */
+
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
     };
   }
 
-  //Logout
-
+  /*
+   * LOGOUT
+   */
   async logout(refreshToken: string) {
     const existingToken = await authRepository.findRefreshToken(refreshToken);
 
@@ -293,8 +344,9 @@ export class AuthService {
     };
   }
 
-  //logout all
-
+  /*
+   * LOGOUT ALL
+   */
   async logoutAll(userId: string) {
     const user = await authRepository.findUserById(userId);
 
@@ -309,7 +361,9 @@ export class AuthService {
     };
   }
 
-  // me
+  /*
+   * ME
+   */
   async me(userId: string) {
     const user = await authRepository.findUserById(userId);
 

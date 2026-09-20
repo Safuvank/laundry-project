@@ -16,6 +16,38 @@ import { NotFoundError } from "../../../shared/errors/NotFoundErrror.js";
 
 export class PaymentService {
   /* -------------------------------------------------------------------------- */
+  /*                              PRIVATE HELPERS                               */
+  /* -------------------------------------------------------------------------- */
+
+  /**
+   * Safely converts either:
+   *
+   * - MongoDB ObjectId
+   * - populated Mongoose document
+   *
+   * into a string ObjectId.
+   */
+  private getObjectIdString(value: unknown): string {
+    if (!value) {
+      return "";
+    }
+
+    if (value instanceof Types.ObjectId) {
+      return value.toString();
+    }
+
+    if (
+      typeof value === "object" &&
+      "_id" in value &&
+      value._id instanceof Types.ObjectId
+    ) {
+      return value._id.toString();
+    }
+
+    return String(value);
+  }
+
+  /* -------------------------------------------------------------------------- */
   /*                              CREATE PAYMENT                                */
   /* -------------------------------------------------------------------------- */
 
@@ -26,6 +58,14 @@ export class PaymentService {
     },
     userId: string,
   ) {
+    console.log("\n======================================");
+    console.log("CREATE PAYMENT");
+    console.log("======================================");
+    console.log("Order ID:", data.orderId);
+    console.log("Authenticated User ID:", userId);
+    console.log("Payment Method:", data.paymentMethod);
+    console.log("======================================");
+
     if (!Types.ObjectId.isValid(data.orderId)) {
       throw new ValidationError("Invalid order id.");
     }
@@ -40,7 +80,14 @@ export class PaymentService {
       throw new NotFoundError("Order not found.");
     }
 
-    if (order.userId.toString() !== userId) {
+    const orderUserId = this.getObjectIdString(order.userId);
+
+    console.log("CREATE PAYMENT - OWNERSHIP CHECK");
+    console.log("Order User ID:", orderUserId);
+    console.log("Authenticated User ID:", userId);
+    console.log("Ownership Match:", orderUserId === userId);
+
+    if (orderUserId !== userId) {
       throw new ValidationError("Order does not belong to this user.");
     }
 
@@ -86,6 +133,13 @@ export class PaymentService {
   /* -------------------------------------------------------------------------- */
 
   async getById(paymentId: string, userId: string) {
+    console.log("\n======================================");
+    console.log("GET PAYMENT BY ID");
+    console.log("======================================");
+    console.log("Payment ID:", paymentId);
+    console.log("Authenticated User ID:", userId);
+    console.log("======================================");
+
     if (!Types.ObjectId.isValid(paymentId)) {
       throw new ValidationError("Invalid payment id.");
     }
@@ -97,12 +151,27 @@ export class PaymentService {
     const payment = await paymentRepository.findByIdPopulated(paymentId);
 
     if (!payment) {
+      console.log("GET PAYMENT BY ID - Payment not found.");
+
       throw new NotFoundError("Payment not found.");
     }
 
-    if (payment.userId.toString() !== userId) {
+    const paymentUserId = this.getObjectIdString(payment.userId);
+
+    console.log("\n---------- PAYMENT OWNERSHIP DEBUG ----------");
+    console.log("Payment ID:", payment._id?.toString());
+    console.log("Payment User ID:", paymentUserId);
+    console.log("Authenticated User ID:", userId);
+    console.log("Ownership Match:", paymentUserId === userId);
+    console.log("----------------------------------------------");
+
+    if (paymentUserId !== userId) {
+      console.log("GET PAYMENT BY ID - OWNERSHIP FAILED");
+
       throw new ValidationError("Payment does not belong to this user.");
     }
+
+    console.log("GET PAYMENT BY ID - OWNERSHIP VERIFIED");
 
     return payment;
   }
@@ -112,23 +181,85 @@ export class PaymentService {
   /* -------------------------------------------------------------------------- */
 
   async getByOrderId(orderId: string, userId: string) {
+    console.log("\n======================================");
+    console.log("GET PAYMENT BY ORDER ID");
+    console.log("======================================");
+    console.log("Order ID:", orderId);
+    console.log("Authenticated User ID:", userId);
+    console.log("======================================");
+
     if (!Types.ObjectId.isValid(orderId)) {
+      console.log("Invalid order ID:", orderId);
+
       throw new ValidationError("Invalid order id.");
     }
 
     if (!Types.ObjectId.isValid(userId)) {
+      console.log("Invalid authenticated user ID:", userId);
+
       throw new ValidationError("Invalid user id.");
     }
+
+    console.log("Searching payment for order:", orderId);
 
     const payment = await paymentRepository.findByOrderIdPopulated(orderId);
 
     if (!payment) {
+      console.log("\n---------- PAYMENT DEBUG ----------");
+      console.log("Payment NOT FOUND for order.");
+      console.log("Order ID:", orderId);
+      console.log("Authenticated User ID:", userId);
+      console.log("-----------------------------------");
+
       throw new NotFoundError("Payment not found for this order.");
     }
 
-    if (payment.userId.toString() !== userId) {
+    /*
+     * IMPORTANT:
+     *
+     * findByOrderIdPopulated() populates:
+     *
+     * payment.orderId
+     * payment.userId
+     *
+     * Therefore we must extract their _id values instead of calling
+     * .toString() directly on the populated objects.
+     */
+
+    const paymentUserId = this.getObjectIdString(payment.userId);
+    const paymentOrderId = this.getObjectIdString(payment.orderId);
+
+    console.log("\n======================================");
+    console.log("PAYMENT OWNERSHIP DEBUG");
+    console.log("======================================");
+    console.log("Payment ID:", payment._id?.toString());
+    console.log("Payment Order ID:", paymentOrderId);
+    console.log("Payment User ID:", paymentUserId);
+    console.log("Authenticated User ID:", userId);
+    console.log("Ownership Match:", paymentUserId === userId);
+    console.log("Payment Status:", payment.status);
+    console.log("Payment Amount:", payment.amount);
+    console.log("======================================");
+
+    if (paymentUserId !== userId) {
+      console.log("\n======================================");
+      console.log("PAYMENT OWNERSHIP FAILED");
+      console.log("======================================");
+      console.log("Payment belongs to:", paymentUserId);
+      console.log("Request made by:", userId);
+      console.log("Order ID:", orderId);
+      console.log("======================================\n");
+
       throw new ValidationError("Payment does not belong to this user.");
     }
+
+    console.log("\n======================================");
+    console.log("PAYMENT OWNERSHIP VERIFIED");
+    console.log("======================================");
+    console.log("Payment ID:", payment._id?.toString());
+    console.log("Payment User ID:", paymentUserId);
+    console.log("Authenticated User ID:", userId);
+    console.log("======================================\n");
 
     return payment;
   }
@@ -138,6 +269,12 @@ export class PaymentService {
   /* -------------------------------------------------------------------------- */
 
   async getMyPayments(userId: string) {
+    console.log("\n======================================");
+    console.log("GET MY PAYMENTS");
+    console.log("======================================");
+    console.log("Authenticated User ID:", userId);
+    console.log("======================================");
+
     if (!Types.ObjectId.isValid(userId)) {
       throw new ValidationError("Invalid user id.");
     }
@@ -150,6 +287,13 @@ export class PaymentService {
   /* -------------------------------------------------------------------------- */
 
   async initiatePayment(paymentId: string, userId: string) {
+    console.log("\n======================================");
+    console.log("INITIATE PAYMENT");
+    console.log("======================================");
+    console.log("Payment ID:", paymentId);
+    console.log("Authenticated User ID:", userId);
+    console.log("======================================");
+
     if (!Types.ObjectId.isValid(paymentId)) {
       throw new ValidationError("Invalid payment id.");
     }
@@ -164,7 +308,18 @@ export class PaymentService {
       throw new NotFoundError("Payment not found.");
     }
 
-    if (payment.userId.toString() !== userId) {
+    const paymentUserId = this.getObjectIdString(payment.userId);
+
+    console.log("\n---------- INITIATE OWNERSHIP DEBUG ----------");
+    console.log("Payment ID:", payment._id?.toString());
+    console.log("Payment User ID:", paymentUserId);
+    console.log("Authenticated User ID:", userId);
+    console.log("Ownership Match:", paymentUserId === userId);
+    console.log("----------------------------------------------");
+
+    if (paymentUserId !== userId) {
+      console.log("INITIATE PAYMENT - OWNERSHIP FAILED");
+
       throw new ValidationError("Payment does not belong to this user.");
     }
 
@@ -214,6 +369,13 @@ export class PaymentService {
    * paymentStatus → PAID
    */
   async markPaymentSuccess(paymentId: string, transactionId: string) {
+    console.log("\n======================================");
+    console.log("MARK PAYMENT SUCCESS");
+    console.log("======================================");
+    console.log("Payment ID:", paymentId);
+    console.log("Transaction ID:", transactionId);
+    console.log("======================================");
+
     if (!Types.ObjectId.isValid(paymentId)) {
       throw new ValidationError("Invalid payment id.");
     }
@@ -286,6 +448,12 @@ export class PaymentService {
   /* -------------------------------------------------------------------------- */
 
   async markPaymentFailed(paymentId: string, failureReason: string) {
+    console.log("\n======================================");
+    console.log("MARK PAYMENT FAILED");
+    console.log("======================================");
+    console.log("Payment ID:", paymentId);
+    console.log("======================================");
+
     if (!Types.ObjectId.isValid(paymentId)) {
       throw new ValidationError("Invalid payment id.");
     }
@@ -366,6 +534,13 @@ export class PaymentService {
     refundId: string,
     refundReason: string,
   ) {
+    console.log("\n======================================");
+    console.log("REFUND PAYMENT");
+    console.log("======================================");
+    console.log("Payment ID:", paymentId);
+    console.log("Refund ID:", refundId);
+    console.log("======================================");
+
     if (!Types.ObjectId.isValid(paymentId)) {
       throw new ValidationError("Invalid payment id.");
     }

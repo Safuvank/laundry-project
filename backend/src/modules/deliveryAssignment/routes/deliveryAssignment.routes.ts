@@ -1,3 +1,5 @@
+
+
 import { Router } from "express";
 
 import { deliveryAssignmentController } from "../controllers/deliveryAssignment.controller.js";
@@ -38,16 +40,6 @@ router.post(
  * Automatically create delivery assignment
  *
  * Admin only
- *
- * Order must be:
- *
- * READY_FOR_DELIVERY
- *        ↓
- * Find available delivery agent within 5 km
- *        ↓
- * Create DELIVERY assignment
- *        ↓
- * OFFERED
  *
  * POST /api/v1/delivery-assignments/delivery
  *
@@ -150,6 +142,22 @@ router.get(
 /* -------------------------------------------------------------------------- */
 /*                          DELIVERY AGENT ROUTES                             */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Get my delivery assignments
+ *
+ * Delivery Agent only
+ *
+ * The delivery agent is identified from the authenticated user.
+ *
+ * GET /api/v1/delivery-assignments/me
+ */
+router.get(
+  "/me",
+  authenticate,
+  authorize(UserRole.DELIVERY_AGENT),
+  deliveryAssignmentController.getMyAssignments,
+);
 
 /**
  * Accept assignment

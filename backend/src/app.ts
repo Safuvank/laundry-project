@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 
+import { env } from "./config/env.js";
+
 import authRoutes from "./modules/auth/routes/auth.routes.js";
 import userRoutes from "./modules/user/routes/user.routes.js";
 import addressRoutes from "./modules/address/routes/address.routes.js";
@@ -14,22 +16,29 @@ import deliveryAgentRoutes from "./modules/deliveryAgent/routes/deliveryAgent.ro
 import deliveryAssignmentRoutes from "./modules/deliveryAssignment/routes/deliveryAssignment.routes.js";
 import notificationRoutes from "./modules/notification/routes/notification.routes.js";
 import paymentRoutes from "./modules/payment/routes/payment.routes.js";
+import adminRoutes from "./modules/admin/routes/admin.routes.js";
 
 import { errorHandler } from "./shared/middlewares/errorHandler.js";
 
 const app = express();
 
 /*
- Middleware
-*/
+ * Middleware
+ */
+console.log("🌐 FRONTEND_URL:", env.FRONTEND_URL);
+app.use(
+  cors({
+    origin: env.FRONTEND_URL,
+    credentials: true,
+  }),
+);
 
-app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
 
 /*
- Health Check
-*/
+ * Health Check
+ */
 
 app.get("/", (req, res) => {
   res.json({
@@ -39,8 +48,8 @@ app.get("/", (req, res) => {
 });
 
 /*
- Routes
-*/
+ * Routes
+ */
 
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
@@ -54,10 +63,10 @@ app.use("/api/v1/delivery-agents", deliveryAgentRoutes);
 app.use("/api/v1/delivery-assignments", deliveryAssignmentRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/payments", paymentRoutes);
-
+app.use("/api/v1/admin", adminRoutes);
 /*
- Global Error Handler
-*/
+ * Global Error Handler
+ */
 
 app.use(errorHandler);
 

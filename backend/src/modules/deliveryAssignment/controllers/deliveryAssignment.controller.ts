@@ -57,50 +57,112 @@ class DeliveryAssignmentController {
     });
   });
 
-  /* -------------------------------------------------------------------------- */
-  /*                       CREATE DELIVERY ASSIGNMENT                           */
-  /* -------------------------------------------------------------------------- */
 
-  /**
-   * Automatically create delivery assignment
-   *
-   * Admin only
-   *
-   * The service:
-   *
-   * READY_FOR_DELIVERY
-   *        ↓
-   * Find customer address
-   *        ↓
-   * Find available agents within 5 km
-   *        ↓
-   * Create DELIVERY assignment
-   *        ↓
-   * OFFERED
-   *
-   * POST /api/v1/delivery-assignments/delivery
-   */
-  createDeliveryAssignment = asyncHandler(
-    async (req: Request, res: Response) => {
-      const { orderId } = req.body;
+/**
+ * Automatically create delivery assignment
+ *
+ * Admin only
+ *
+ * Required body:
+ * - orderId
+ * - latitude
+ * - longitude
+ *
+ * The admin's current location is required
+ * when assigning a delivery agent.
+ *
+ * POST /api/v1/delivery-assignments/delivery
+ */
+createDeliveryAssignment = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { orderId, latitude, longitude } = req.body;
 
-      if (!orderId) {
-        return res.status(400).json({
-          success: false,
-          message: "Order id is required.",
-        });
-      }
+    /* ---------------------------------------------------------------------- */
+    /* Validate Order ID                                                      */
+    /* ---------------------------------------------------------------------- */
 
-      const assignment =
-        await deliveryAssignmentService.createDeliveryAssignment(orderId);
-
-      return res.status(201).json({
-        success: true,
-        message: "Delivery assignment created successfully.",
-        data: assignment,
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: "Order id is required.",
       });
-    },
-  );
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Validate Admin Location                                                */
+    /* ---------------------------------------------------------------------- */
+
+    if (latitude === undefined || latitude === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin latitude is required.",
+      });
+    }
+
+    if (longitude === undefined || longitude === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin longitude is required.",
+      });
+    }
+
+    const adminLatitude = Number(latitude);
+    const adminLongitude = Number(longitude);
+
+    if (!Number.isFinite(adminLatitude)) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin latitude must be a valid number.",
+      });
+    }
+
+    if (!Number.isFinite(adminLongitude)) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin longitude must be a valid number.",
+      });
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Validate Coordinate Ranges                                             */
+    /* ---------------------------------------------------------------------- */
+
+    if (adminLatitude < -90 || adminLatitude > 90) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin latitude must be between -90 and 90.",
+      });
+    }
+
+    if (adminLongitude < -180 || adminLongitude > 180) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin longitude must be between -180 and 180.",
+      });
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /* Create Delivery Assignment                                             */
+    /* ---------------------------------------------------------------------- */
+
+    const assignment =
+      await deliveryAssignmentService.createDeliveryAssignment(
+        orderId,
+        adminLatitude,
+        adminLongitude,
+      );
+
+    /* ---------------------------------------------------------------------- */
+    /* Response                                                               */
+    /* ---------------------------------------------------------------------- */
+
+    return res.status(201).json({
+      success: true,
+      message: "Delivery assignment created successfully.",
+      data: assignment,
+    });
+  },
+);
 
   /* -------------------------------------------------------------------------- */
   /*                                GET BY ID                                  */
@@ -266,6 +328,35 @@ class DeliveryAssignmentController {
 
     return deliveryAgent._id.toString();
   }
+
+  /* -------------------------------------------------------------------------- */
+  /*                         GET MY ASSIGNMENTS                                */
+  /* -------------------------------------------------------------------------- */
+
+  /**
+   * Get assignments for the authenticated delivery agent
+   *
+   * Delivery Agent only
+   *
+   * GET /api/v1/delivery-assignments/me
+   *
+   * The authenticated User._id is resolved to the
+   * DeliveryAgent._id internally.
+   */
+  getMyAssignments = asyncHandler(async (req: Request, res: Response) => {
+    const deliveryAgentId = await this.getAuthenticatedDeliveryAgentId(
+      req.user.userId,
+    );
+
+    const assignments =
+      await deliveryAssignmentService.getByAgentId(deliveryAgentId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Delivery assignments retrieved successfully.",
+      data: assignments,
+    });
+  });
 
   /* -------------------------------------------------------------------------- */
   /*                                ACCEPT                                     */

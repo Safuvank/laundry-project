@@ -70,7 +70,7 @@ class AddressService {
   /**
    * Validate GeoJSON location
    *
-   * coordinates:
+   * Coordinates:
    *
    * [longitude, latitude]
    */
@@ -92,12 +92,40 @@ class AddressService {
       );
     }
 
+    /* ---------------------------------------------------------------------- */
+    /*                         NUMBER VALIDATION                              */
+    /* ---------------------------------------------------------------------- */
+
+    if (!Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+      throw new ValidationError(
+        "Longitude and latitude must be valid numbers.",
+      );
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /*                         ZERO LOCATION PROTECTION                       */
+    /* ---------------------------------------------------------------------- */
+
+    if (longitude === 0 && latitude === 0) {
+      throw new ValidationError(
+        "Valid pickup location is required.",
+      );
+    }
+
+    /* ---------------------------------------------------------------------- */
+    /*                         RANGE VALIDATION                               */
+    /* ---------------------------------------------------------------------- */
+
     if (longitude < -180 || longitude > 180) {
-      throw new ValidationError("Longitude must be between -180 and 180.");
+      throw new ValidationError(
+        "Longitude must be between -180 and 180.",
+      );
     }
 
     if (latitude < -90 || latitude > 90) {
-      throw new ValidationError("Latitude must be between -90 and 90.");
+      throw new ValidationError(
+        "Latitude must be between -90 and 90.",
+      );
     }
   }
 
@@ -123,7 +151,10 @@ class AddressService {
   /**
    * Create address
    */
-  async create(userId: string, data: CreateAddressData): Promise<IAddress> {
+  async create(
+    userId: string,
+    data: CreateAddressData,
+  ): Promise<IAddress> {
     this.validateUserId(userId);
 
     this.validateLocation(data.location);
@@ -203,7 +234,10 @@ class AddressService {
   /**
    * Get user's address by ID
    */
-  async getById(userId: string, addressId: string): Promise<IAddress> {
+  async getById(
+    userId: string,
+    addressId: string,
+  ): Promise<IAddress> {
     this.validateUserId(userId);
 
     const address = await this.getAddressOrFail(addressId);
@@ -214,7 +248,9 @@ class AddressService {
      * to the logged-in user.
      */
     if (address.userId.toString() !== userId) {
-      throw new ValidationError("Address does not belong to this user.");
+      throw new ValidationError(
+        "Address does not belong to this user.",
+      );
     }
 
     return address;
@@ -333,7 +369,10 @@ class AddressService {
     /*                               DATABASE                                 */
     /* ---------------------------------------------------------------------- */
 
-    const updated = await addressRepository.update(address._id, updateData);
+    const updated = await addressRepository.update(
+      address._id,
+      updateData,
+    );
 
     if (!updated) {
       throw new NotFoundError("Address not found.");
@@ -349,7 +388,10 @@ class AddressService {
   /**
    * Set user's address as default
    */
-  async setDefault(userId: string, addressId: string): Promise<IAddress> {
+  async setDefault(
+    userId: string,
+    addressId: string,
+  ): Promise<IAddress> {
     this.validateUserId(userId);
 
     const address = await this.getById(userId, addressId);
@@ -379,12 +421,17 @@ class AddressService {
   /**
    * Soft delete / deactivate address
    */
-  async deactivate(userId: string, addressId: string): Promise<IAddress> {
+  async deactivate(
+    userId: string,
+    addressId: string,
+  ): Promise<IAddress> {
     this.validateUserId(userId);
 
     const address = await this.getById(userId, addressId);
 
-    const updated = await addressRepository.deactivate(address._id);
+    const updated = await addressRepository.deactivate(
+      address._id,
+    );
 
     if (!updated) {
       throw new NotFoundError("Address not found.");
@@ -403,10 +450,13 @@ class AddressService {
    * We use soft delete instead of
    * permanently removing the document.
    */
-  async delete(userId: string, addressId: string): Promise<IAddress> {
+  async delete(
+    userId: string,
+    addressId: string,
+  ): Promise<IAddress> {
     this.validateUserId(userId);
 
-    const address = await this.getById(userId, addressId);
+    const address = await this.getAddressOrFail(addressId);
 
     const deleted = await addressRepository.delete(address._id);
 

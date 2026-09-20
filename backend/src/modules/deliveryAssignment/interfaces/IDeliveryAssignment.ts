@@ -15,10 +15,22 @@ export interface IDeliveryAssignment extends Document {
    */
   deliveryAgentId: Types.ObjectId;
 
+  /**
+   * Type of assignment
+   *
+   * PICKUP or DELIVERY
+   */
   assignmentType: DeliveryAssignmentType;
 
   /**
-   * Assignment status
+   * Assignment lifecycle:
+   *
+   * OFFERED
+   * ACCEPTED
+   * IN_PROGRESS
+   * COMPLETED
+   *
+   * REJECTED / CANCELLED
    */
   status: DeliveryAssignmentStatus;
 
@@ -40,6 +52,12 @@ export interface IDeliveryAssignment extends Document {
   rejectedAt?: Date;
 
   /**
+   * When the delivery agent started
+   * the pickup or delivery
+   */
+  startedAt?: Date;
+
+  /**
    * When the assignment was completed
    */
   completedAt?: Date;
@@ -55,7 +73,13 @@ export interface IDeliveryAssignment extends Document {
    */
   isActive: boolean;
 
+  /**
+   * Assignment creation timestamp
+   */
   createdAt: Date;
 
+  /**
+   * Assignment last update timestamp
+   */
   updatedAt: Date;
 }

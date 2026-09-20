@@ -16,6 +16,20 @@ export interface IOrder extends Document {
   addressId: Types.ObjectId;
 
   /**
+   * Customer Pickup Location
+   *
+   * Location captured from the customer's browser
+   * at the time of booking.
+   *
+   * GeoJSON coordinates:
+   * [longitude, latitude]
+   */
+  pickupLocation: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+
+  /**
    * Selected Turnaround Plan
    */
   turnaroundPlanId: Types.ObjectId;

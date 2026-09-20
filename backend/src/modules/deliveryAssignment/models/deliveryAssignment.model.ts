@@ -21,6 +21,16 @@ const deliveryAssignmentSchema = new Schema<IDeliveryAssignment>(
       required: true,
     },
 
+    /* ---------------------------------------------------------------------- */
+    /*                           ASSIGNMENT TYPE                              */
+    /* ---------------------------------------------------------------------- */
+
+    /**
+     * Type of delivery assignment
+     *
+     * PICKUP   → Agent picks up laundry from customer
+     * DELIVERY → Agent delivers laundry to customer
+     */
     assignmentType: {
       type: String,
       enum: Object.values(DeliveryAssignmentType),
@@ -45,13 +55,23 @@ const deliveryAssignmentSchema = new Schema<IDeliveryAssignment>(
     /* ---------------------------------------------------------------------- */
 
     /**
-     * Assignment status
+     * Assignment lifecycle:
+     *
+     * OFFERED
+     *    ↓
+     * ACCEPTED
+     *    ↓
+     * IN_PROGRESS
+     *    ↓
+     * COMPLETED
+     *
+     * REJECTED / CANCELLED are terminal states.
      */
     status: {
       type: String,
       enum: Object.values(DeliveryAssignmentStatus),
       required: true,
-      default: DeliveryAssignmentStatus.PENDING,
+      default: DeliveryAssignmentStatus.OFFERED,
     },
 
     /* ---------------------------------------------------------------------- */
@@ -80,6 +100,13 @@ const deliveryAssignmentSchema = new Schema<IDeliveryAssignment>(
     },
 
     /**
+     * When agent started working on the assignment
+     */
+    startedAt: {
+      type: Date,
+    },
+
+    /**
      * When assignment was completed
      */
     completedAt: {
@@ -99,6 +126,12 @@ const deliveryAssignmentSchema = new Schema<IDeliveryAssignment>(
     /*                                ACTIVE                                  */
     /* ---------------------------------------------------------------------- */
 
+    /**
+     * Whether this assignment is currently active.
+     *
+     * OFFERED / ACCEPTED / IN_PROGRESS → true
+     * REJECTED / COMPLETED / CANCELLED → false
+     */
     isActive: {
       type: Boolean,
       default: true,

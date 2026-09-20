@@ -52,15 +52,17 @@ class OrderRepository {
   /**
    * Find Orders By User
    */
+  // async findByUser(userId: string): Promise<IOrder[]> {
+  //   return Order.find({
+  //     userId,
+  //     isActive: true,
+  //   }).sort({ createdAt: -1 });
+  // }
   async findByUser(userId: string): Promise<IOrder[]> {
     return Order.find({
       userId,
       isActive: true,
-    })
-      .populate("addressId")
-      .populate("turnaroundPlanId")
-      .populate("laundryServiceIds")
-      .sort({ createdAt: -1 });
+    }).sort({ createdAt: -1 });
   }
 
   /**

@@ -34,6 +34,7 @@ import { DeliveryAssignmentType } from "../../deliveryAssignment/constants/deliv
 
 import { notificationService } from "../../notification/services/notification.service.js";
 import { NotificationType } from "../../notification/constants/notificationType.js";
+
 /* -------------------------------------------------------------------------- */
 /*                              Create Order Data                             */
 /* -------------------------------------------------------------------------- */
@@ -46,6 +47,21 @@ interface CreateOrderData {
   laundryServiceIds: string[];
 
   pickupSlotId: string;
+
+  /**
+   * Customer location captured from the browser
+   * at the time of booking.
+   *
+   * Coordinates are received as:
+   * latitude + longitude
+   *
+   * They are stored in MongoDB as:
+   * [longitude, latitude]
+   */
+  pickupLocation: {
+    latitude: number;
+    longitude: number;
+  };
 
   detergentPreference?: string;
 
@@ -132,23 +148,13 @@ const allowedStatusTransitions: Record<OrderStatus, OrderStatus[]> = {
 /* -------------------------------------------------------------------------- */
 
 const allowedPaymentTransitions: Record<PaymentStatus, PaymentStatus[]> = {
-  [PaymentStatus.PENDING]: [
-    PaymentStatus.PARTIALLY_PAID,
-    PaymentStatus.PAID,
-    PaymentStatus.FAILED,
-  ],
-
-  [PaymentStatus.PARTIALLY_PAID]: [PaymentStatus.PAID, PaymentStatus.FAILED],
+  [PaymentStatus.PENDING]: [PaymentStatus.PAID, PaymentStatus.FAILED],
 
   [PaymentStatus.PAID]: [PaymentStatus.REFUNDED],
 
   [PaymentStatus.REFUNDED]: [],
 
-  [PaymentStatus.FAILED]: [
-    PaymentStatus.PENDING,
-    PaymentStatus.PARTIALLY_PAID,
-    PaymentStatus.PAID,
-  ],
+  [PaymentStatus.FAILED]: [PaymentStatus.PENDING, PaymentStatus.PAID],
 };
 
 /* -------------------------------------------------------------------------- */
@@ -166,6 +172,29 @@ class OrderService {
   private validateObjectId(id: string, fieldName = "id"): void {
     if (!Types.ObjectId.isValid(id)) {
       throw new ValidationError(`Invalid ${fieldName}.`);
+    }
+  }
+
+  /**
+   * Validate customer pickup location
+   *
+   * Latitude:
+   *   -90 to 90
+   *
+   * Longitude:
+   *   -180 to 180
+   */
+  private validatePickupLocation(
+    pickupLocation: CreateOrderData["pickupLocation"],
+  ): void {
+    const { latitude, longitude } = pickupLocation;
+
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+      throw new ValidationError("Invalid pickup latitude.");
+    }
+
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      throw new ValidationError("Invalid pickup longitude.");
     }
   }
 
@@ -340,24 +369,25 @@ class OrderService {
 
   /**
    * Find a nearby available delivery agent
-   * and create a delivery assignment.
+   * and create a pickup assignment.
    *
-   * Radius: 5 km
+   * Location source:
+   * Customer's booking-time pickup location.
+   *
+   * Radius:
+   * 5 km
    */
-  private async assignNearbyDeliveryAgent(
-    orderId: string,
-    address: IAddress,
-  ): Promise<void> {
-    if (!address.location) {
-      throw new ValidationError("Customer address does not have a location.");
+  private async assignNearbyDeliveryAgent(order: IOrder): Promise<void> {
+    if (!order.pickupLocation) {
+      throw new ValidationError("Order does not have a pickup location.");
     }
 
-    const longitude = address.location.coordinates[0];
+    const longitude = order.pickupLocation.coordinates[0];
 
-    const latitude = address.location.coordinates[1];
+    const latitude = order.pickupLocation.coordinates[1];
 
     if (longitude === undefined || latitude === undefined) {
-      throw new ValidationError("Customer address has invalid location.");
+      throw new ValidationError("Order has invalid pickup location.");
     }
 
     /*
@@ -393,7 +423,7 @@ class OrderService {
     for (const agent of nearbyAgents) {
       try {
         await deliveryAssignmentService.create(
-          orderId,
+          order._id.toString(),
           agent._id.toString(),
           DeliveryAssignmentType.PICKUP,
         );
@@ -438,24 +468,40 @@ class OrderService {
     // 2. Validate address
     const address = await this.validateAddress(data.addressId, userId);
 
-    // 3. Validate turnaround plan
+    // 3. Validate customer pickup location
+    if (!data.pickupLocation) {
+      throw new ValidationError(
+        "Pickup location is required to create an order.",
+      );
+    }
+
+    this.validatePickupLocation(data.pickupLocation);
+
+    console.log("CREATE ORDER PICKUP LOCATION:", {
+      latitude: data.pickupLocation.latitude,
+      longitude: data.pickupLocation.longitude,
+    });
+
+    // 4. Validate turnaround plan
     const turnaroundPlan = await this.validateTurnaroundPlan(
       data.turnaroundPlanId,
     );
 
-    // 4. Validate services
-    const services = await this.validateLaundryServices(data.laundryServiceIds);
+    // 5. Validate services
+    const services = await this.validateLaundryServices(
+      data.laundryServiceIds,
+    );
 
-    // 5. Validate pickup slot
+    // 6. Validate pickup slot
     const pickupSlot = await this.validatePickupSlot(data.pickupSlotId);
 
-    // 6. Calculate price
+    // 7. Calculate price
     const estimatedPrice = await this.calculateEstimatedPrice(
       data.turnaroundPlanId,
       data.laundryServiceIds,
     );
 
-    // 7. Reserve pickup slot
+    // 8. Reserve pickup slot
     const reservedSlot = await pickupSlotRepository.incrementBookedCount(
       data.pickupSlotId,
     );
@@ -467,11 +513,25 @@ class OrderService {
     let order: IOrder;
 
     try {
-      // 8. Create order
+      // 9. Create order
       order = await orderRepository.create({
         userId: new Types.ObjectId(userId),
 
         addressId: address._id,
+
+        /**
+         * Customer's location at booking time.
+         *
+         * MongoDB GeoJSON format:
+         * [longitude, latitude]
+         */
+        pickupLocation: {
+          type: "Point",
+          coordinates: [
+            data.pickupLocation.longitude,
+            data.pickupLocation.latitude,
+          ],
+        },
 
         turnaroundPlanId: turnaroundPlan._id,
 
@@ -512,20 +572,32 @@ class OrderService {
         isActive: true,
       });
     } catch (error) {
-      // Rollback pickup reservation
+      // Rollback pickup reservation when order creation fails.
       await pickupSlotRepository.decrementBookedCount(data.pickupSlotId);
 
       throw error;
     }
 
     /*
-     * 9. Find nearby delivery agent
+     * 10. Try to find and assign a nearby delivery agent.
+     *
+     * The customer's booking-time location is used as the
+     * center of the 5 km search radius.
+     *
+     * Failure to assign an agent must NOT make the order
+     * creation fail. The order remains BOOKED and can be
+     * assigned later.
      */
-    await this.assignNearbyDeliveryAgent(order._id.toString(), address);
+    try {
+      await this.assignNearbyDeliveryAgent(order);
+    } catch (error) {
+      console.error(
+        "Delivery agent assignment failed after order creation:",
+        error,
+      );
+    }
 
-    /*
-     * 10. Return order
-     */
+    // 11. Return successfully created order.
     return order;
   }
 
@@ -665,9 +737,13 @@ class OrderService {
 
     await notificationService.create({
       userId: updatedOrder.userId.toString(),
+
       orderId: updatedOrder._id.toString(),
+
       type: NotificationType.RECEIVED_AT_FACILITY,
+
       title: "Order Received",
+
       message: "Your laundry order has been received at our facility.",
     });
 
@@ -709,9 +785,13 @@ class OrderService {
 
     await notificationService.create({
       userId: updatedOrder.userId.toString(),
+
       orderId: updatedOrder._id.toString(),
+
       type: NotificationType.INSPECTION_STARTED,
+
       title: "Inspection Started",
+
       message: "Your laundry order is now being inspected.",
     });
 
@@ -758,14 +838,19 @@ class OrderService {
 
     await notificationService.create({
       userId: updatedOrder.userId.toString(),
+
       orderId: updatedOrder._id.toString(),
+
       type: NotificationType.PRICE_FINALIZED,
+
       title: "Price Finalized",
+
       message: `The final price for your laundry order is ₹${updatedOrder.finalPrice}.`,
     });
 
     return updatedOrder;
   }
+
   /**
    * Request customer approval for finalized price
    *
@@ -801,9 +886,13 @@ class OrderService {
 
     await notificationService.create({
       userId: updatedOrder.userId.toString(),
+
       orderId: updatedOrder._id.toString(),
+
       type: NotificationType.CUSTOMER_APPROVAL_REQUIRED,
+
       title: "Price Approval Required",
+
       message:
         "Your laundry order price has been finalized. Please review and approve the price.",
     });
@@ -824,6 +913,7 @@ class OrderService {
    */
   async approvePrice(orderId: string, userId: string): Promise<IOrder> {
     this.validateObjectId(orderId, "order id");
+
     this.validateObjectId(userId, "user id");
 
     const order = await this.getOrderOrFail(orderId);
@@ -851,9 +941,13 @@ class OrderService {
 
     await notificationService.create({
       userId: updatedOrder.userId.toString(),
+
       orderId: updatedOrder._id.toString(),
+
       type: NotificationType.PRICE_APPROVED,
+
       title: "Price Approved",
+
       message: "Your order has been approved and processing has started.",
     });
 
@@ -867,12 +961,13 @@ class OrderService {
    *
    * CUSTOMER_APPROVAL_PENDING
    *          ↓
-   *       REJECT
+   *        REJECT
    *          ↓
-   *       ON_HOLD
+   *        ON_HOLD
    */
   async rejectPrice(orderId: string, userId: string): Promise<IOrder> {
     this.validateObjectId(orderId, "order id");
+
     this.validateObjectId(userId, "user id");
 
     const order = await this.getOrderOrFail(orderId);
@@ -900,9 +995,13 @@ class OrderService {
 
     await notificationService.create({
       userId: updatedOrder.userId.toString(),
+
       orderId: updatedOrder._id.toString(),
+
       type: NotificationType.PRICE_REJECTED,
+
       title: "Price Rejected",
+
       message:
         "The finalized price was rejected. Your order has been placed on hold.",
     });
@@ -913,13 +1012,10 @@ class OrderService {
   /**
    * Start quality check
    *
-   * Flow:
-   *
    * PROCESSING
    *     ↓
    * QUALITY_CHECK
    */
-
   async startQualityCheck(orderId: string): Promise<IOrder> {
     this.validateObjectId(orderId, "order id");
 
@@ -946,9 +1042,13 @@ class OrderService {
 
     await notificationService.create({
       userId: updatedOrder.userId.toString(),
+
       orderId: updatedOrder._id.toString(),
+
       type: NotificationType.QUALITY_CHECK_STARTED,
+
       title: "Quality Check Started",
+
       message: "Your laundry order is now undergoing quality checking.",
     });
 
@@ -957,8 +1057,6 @@ class OrderService {
 
   /**
    * Complete quality check
-   *
-   * Flow:
    *
    * QUALITY_CHECK
    *      ↓
@@ -990,9 +1088,13 @@ class OrderService {
 
     await notificationService.create({
       userId: updatedOrder.userId.toString(),
+
       orderId: updatedOrder._id.toString(),
+
       type: NotificationType.READY_FOR_DELIVERY,
+
       title: "Order Ready",
+
       message: "Your laundry order is ready for delivery.",
     });
 
@@ -1001,8 +1103,6 @@ class OrderService {
 
   /**
    * Complete order
-   *
-   * Flow:
    *
    * DELIVERED
    *     ↓
@@ -1034,9 +1134,13 @@ class OrderService {
 
     await notificationService.create({
       userId: updatedOrder.userId.toString(),
+
       orderId: updatedOrder._id.toString(),
+
       type: NotificationType.ORDER_COMPLETED,
+
       title: "Order Completed",
+
       message: "Your laundry order has been completed successfully.",
     });
 

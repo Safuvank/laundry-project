@@ -16,6 +16,8 @@ import { updateOrderPricingSchema } from "../validators/updateOrderPricing.valid
 
 import { updatePaymentStatusSchema } from "../validators/updatePaymentStatus.validator.js";
 
+import { createOrderSchema } from "../validators/createOrder.validator.js";
+
 const router = Router();
 
 /*
@@ -24,7 +26,12 @@ const router = Router();
 |--------------------------------------------------------------------------
 */
 
-router.post("/", authenticate, orderController.create);
+router.post(
+  "/",
+  authenticate,
+  validateRequest(createOrderSchema),
+  orderController.create,
+);
 
 router.get("/my-orders", authenticate, orderController.getMyOrders);
 
