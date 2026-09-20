@@ -6,8 +6,8 @@ import type { PricingRule } from "../types/pricing.types";
 
 interface PricingTableProps {
   pricingRules: PricingRule[];
-
-  onEdit: (pricingRule: PricingRule) => void;
+  serviceNames: Record<string, string>;
+  onEdit: (rule: PricingRule) => void;
 }
 
 export function PricingTable({
