@@ -35,6 +35,14 @@ export class AuthController {
       password,
     );
 
+    /*
+     * Refresh token is stored in an HTTP-only cookie.
+     *
+     * The access token is returned in the response body
+     * and can be stored by the frontend according to the
+     * application's auth strategy.
+     */
+
     res.cookie("refreshToken", refreshToken, refreshCookieOptions);
 
     return res.status(200).json({
@@ -45,6 +53,85 @@ export class AuthController {
         user,
       },
     });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*                              GOOGLE LOGIN                                  */
+  /* -------------------------------------------------------------------------- */
+
+  googleLogin = asyncHandler(async (_req: Request, res: Response) => {
+    /*
+     * Generate Google's OAuth authorization URL.
+     *
+     * Browser:
+     *
+     * FreshFold
+     *    ↓
+     * /auth/google
+     *    ↓
+     * Google
+     */
+
+    const authorizationUrl = authService.getGoogleAuthorizationUrl();
+
+    return res.redirect(authorizationUrl);
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*                           GOOGLE CALLBACK                                  */
+  /* -------------------------------------------------------------------------- */
+
+  googleCallback = asyncHandler(async (req: Request, res: Response) => {
+    const { code } = req.query;
+
+    /*
+     * Google must provide an authorization code.
+     */
+
+    if (typeof code !== "string" || !code) {
+      throw new UnauthorizedError("Google authorization code is missing.");
+    }
+
+    /*
+     * Exchange the Google authorization code for a
+     * FreshFold authentication session.
+     *
+     * AuthService handles:
+     *
+     * - Google token exchange
+     * - Google ID-token verification
+     * - Finding existing Google users
+     * - Creating new Google users
+     * - Creating FreshFold access/refresh tokens
+     */
+
+    const { refreshToken } = await authService.googleCallback(code);
+
+    /*
+     * Store FreshFold refresh token in an HTTP-only cookie.
+     *
+     * The access token is intentionally NOT placed in
+     * the URL.
+     */
+
+    res.cookie("refreshToken", refreshToken, refreshCookieOptions);
+
+    /*
+     * Redirect to the frontend callback page.
+     *
+     * The frontend should call:
+     *
+     * POST /api/v1/auth/refresh
+     *
+     * after reaching this page.
+     *
+     * The browser automatically sends the HTTP-only
+     * refresh-token cookie.
+     */
+
+    const redirectUrl = new URL("/auth/google/callback", envFrontendUrl());
+
+    return res.redirect(redirectUrl.toString());
   });
 
   /* -------------------------------------------------------------------------- */
@@ -103,6 +190,13 @@ export class AuthController {
 
     const result = await authService.refreshToken(refreshToken);
 
+    /*
+     * Refresh-token rotation.
+     *
+     * Replace the old cookie with the newly generated
+     * refresh token.
+     */
+
     res.cookie("refreshToken", result.refreshToken, refreshCookieOptions);
 
     return res.status(200).json({
@@ -113,6 +207,7 @@ export class AuthController {
       },
     });
   });
+
   /* -------------------------------------------------------------------------- */
   /*                                  LOGOUT                                    */
   /* -------------------------------------------------------------------------- */
@@ -120,9 +215,17 @@ export class AuthController {
   logout = asyncHandler(async (req: Request, res: Response) => {
     const refreshToken = req.cookies.refreshToken;
 
+    if (!refreshToken) {
+      throw new UnauthorizedError("Refresh token is required.");
+    }
+
     const result = await authService.logout(refreshToken);
 
-    res.clearCookie("refreshToken");
+    /*
+     * Remove refresh token cookie from browser.
+     */
+
+    res.clearCookie("refreshToken", refreshCookieOptions);
 
     return res.status(200).json({
       success: true,
@@ -131,17 +234,30 @@ export class AuthController {
   });
 
   /* -------------------------------------------------------------------------- */
-  /*                              LOGOUT ALL                                   */
+  /*                              LOGOUT ALL                                    */
   /* -------------------------------------------------------------------------- */
 
   logoutAll = asyncHandler(async (req: Request, res: Response) => {
-    const { userId } = req.body;
+    /*
+     * Never trust userId from req.body.
+     *
+     * authenticate middleware gets userId from the
+     * verified access token.
+     */
 
-    const data = await authService.logoutAll(userId);
+    const userId = req.user!.userId;
+
+    const result = await authService.logoutAll(userId);
+
+    /*
+     * Remove current browser refresh-token cookie.
+     */
+
+    res.clearCookie("refreshToken", refreshCookieOptions);
 
     return res.status(200).json({
       success: true,
-      message: data.message,
+      message: result.message,
     });
   });
 
@@ -158,5 +274,30 @@ export class AuthController {
     });
   });
 }
+
+/*
+ * --------------------------------------------------------------------------
+ * FRONTEND URL
+ * --------------------------------------------------------------------------
+ *
+ * Kept in one place so the Google callback does not directly access
+ * process.env throughout the controller.
+ *
+ * FRONTEND_URL should be configured in .env.
+ *
+ * Example:
+ *
+ * FRONTEND_URL=http://localhost:3000
+ */
+
+const envFrontendUrl = (): string => {
+  const frontendUrl = process.env.FRONTEND_URL;
+
+  if (!frontendUrl) {
+    throw new Error("FRONTEND_URL is not configured.");
+  }
+
+  return frontendUrl;
+};
 
 export const authController = new AuthController();

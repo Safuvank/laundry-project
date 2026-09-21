@@ -18,18 +18,17 @@ export const useUpdateAdminUser = () => {
     }) => updateAdminUser(userId, payload),
 
     onSuccess: async (_, variables) => {
-      // Refresh Users table
+      // Refresh users
       await queryClient.invalidateQueries({
         queryKey: ["admin", "users"],
       });
 
-      // Refresh specific user
+      // Refresh selected user
       await queryClient.invalidateQueries({
         queryKey: ["admin", "users", variables.userId],
       });
 
-      // IMPORTANT:
-      // Refresh Delivery Agents table
+      // IMPORTANT: refresh delivery agents
       await queryClient.invalidateQueries({
         queryKey: ["admin", "delivery-agents"],
       });

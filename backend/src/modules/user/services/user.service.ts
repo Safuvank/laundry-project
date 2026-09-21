@@ -40,6 +40,7 @@ export class UserService {
       lastName: user.lastName,
       email: user.email,
       phoneNumber: user.phoneNumber,
+      authProvider: user.authProvider,
       role: user.role,
       profileImage: user.profileImage,
       isEmailVerified: user.isEmailVerified,
@@ -83,7 +84,10 @@ export class UserService {
       updateData.phoneNumber = data.phoneNumber;
     }
 
-    const updatedUser = await userRepository.updateProfile(userId, updateData);
+    const updatedUser = await userRepository.updateProfile(
+      userId,
+      updateData,
+    );
 
     return updatedUser;
   }
@@ -100,6 +104,22 @@ export class UserService {
     newPassword: string,
   ) {
     const user = await this.getUserOrFail(userId);
+
+    /*
+    |--------------------------------------------------------------------------
+    | OAuth Account Protection
+    |--------------------------------------------------------------------------
+    |
+    | Google accounts do not have a FreshFold password.
+    | They must manage authentication through Google.
+    |
+    */
+
+    if (user.authProvider === "GOOGLE" || !user.password) {
+      throw new ValidationError(
+        "This account uses Google login. Password changes are not available.",
+      );
+    }
 
     if (currentPassword === newPassword) {
       throw new ValidationError(
@@ -123,8 +143,9 @@ export class UserService {
     /*
     |--------------------------------------------------------------------------
     | Security
-    | Logout user from all devices after password change
     |--------------------------------------------------------------------------
+    | Logout user from all devices after password change.
+    |
     */
 
     await authRepository.deleteAllRefreshTokens(userId);

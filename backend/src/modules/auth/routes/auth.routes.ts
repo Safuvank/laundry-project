@@ -22,19 +22,43 @@ import { userController } from "../../user/controllers/user.controller.js";
 
 const router = Router();
 
+/*
+|--------------------------------------------------------------------------
+| REGISTER
+|--------------------------------------------------------------------------
+*/
+
 router.post(
   "/register",
   validateRequest(registerSchema),
   authController.register,
 );
 
+/*
+|--------------------------------------------------------------------------
+| LOGIN
+|--------------------------------------------------------------------------
+*/
+
 router.post("/login", validateRequest(loginSchema), authController.login);
+
+/*
+|--------------------------------------------------------------------------
+| EMAIL VERIFICATION
+|--------------------------------------------------------------------------
+*/
 
 router.post(
   "/verify-email",
   validateRequest(verifyEmailSchema),
   authController.verifyEmail,
 );
+
+/*
+|--------------------------------------------------------------------------
+| PASSWORD RESET
+|--------------------------------------------------------------------------
+*/
 
 router.post(
   "/forgot-password",
@@ -48,15 +72,32 @@ router.post(
   authController.resetPassword,
 );
 
-// router.post("/refresh", authController.refreshToken);
-router.post("/refresh", authController.refreshToken.bind(authController));
+/*
+|--------------------------------------------------------------------------
+| TOKEN
+|--------------------------------------------------------------------------
+*/
+
+router.post("/refresh", authController.refreshToken);
+
+/*
+|--------------------------------------------------------------------------
+| LOGOUT
+|--------------------------------------------------------------------------
+*/
 
 router.post("/logout", authController.logout);
 
-router.post("/logout-all", authController.logoutAll);
+router.post("/logout-all", authenticate, authController.logoutAll);
+
+/*
+|--------------------------------------------------------------------------
+| CURRENT USER
+|--------------------------------------------------------------------------
+*/
 
 router.get("/profile", authenticate, (req, res) => {
-  res.json({
+  return res.json({
     success: true,
     user: req.user,
   });
@@ -64,11 +105,39 @@ router.get("/profile", authenticate, (req, res) => {
 
 router.get("/me", authenticate, authController.me);
 
+/*
+|--------------------------------------------------------------------------
+| UPDATE CURRENT USER
+|--------------------------------------------------------------------------
+*/
+
 router.patch(
   "/me",
   authenticate,
   validateRequest(updateProfileSchema),
   userController.updateProfile,
 );
+
+/*
+|--------------------------------------------------------------------------
+| GOOGLE OAUTH
+|--------------------------------------------------------------------------
+*/
+
+/*
+ * Step 1:
+ * Redirect the user to Google's OAuth consent screen.
+ *
+ * GET /api/v1/auth/google
+ */
+router.get("/google", authController.googleLogin);
+
+/*
+ * Step 2:
+ * Google redirects the user back here after authentication.
+ *
+ * GET /api/v1/auth/google/callback
+ */
+router.get("/google/callback", authController.googleCallback);
 
 export default router;

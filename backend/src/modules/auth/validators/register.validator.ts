@@ -21,21 +21,26 @@ export const registerSchema = z
       .toLowerCase()
       .email("Invalid email address"),
 
+    phoneNumber: z
+      .string()
+      .trim()
+      .regex(
+        /^\+[1-9]\d{7,14}$/,
+        "Please enter a valid international phone number",
+      ),
+
     password: z
       .string()
       .regex(
         PASSWORD_REGEX,
-        "Password must contain uppercase, lowercase, number and special character"
+        "Password must contain uppercase, lowercase, number and special character",
       ),
 
     confirmPassword: z.string(),
   })
-  .refine(
-    (data) => data.password === data.confirmPassword,
-    {
-      path: ["confirmPassword"],
-      message: "Passwords do not match",
-    }
-  );
+  .refine((data) => data.password === data.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "Passwords do not match",
+  });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

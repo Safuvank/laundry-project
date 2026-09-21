@@ -3,12 +3,18 @@ import { UserRole } from "../constants/roles.js";
 
 export interface IUser extends Document {
   firstName: string;
+
   lastName: string;
 
   email: string;
-  password: string;
+
+  password?: string;
 
   phoneNumber: string | null;
+
+  authProvider: "LOCAL" | "GOOGLE";
+
+  providerId: string | null;
 
   role: UserRole;
 
@@ -21,5 +27,6 @@ export interface IUser extends Document {
   lastLoginAt: Date | null;
 
   createdAt: Date;
+
   updatedAt: Date;
 }

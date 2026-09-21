@@ -22,14 +22,22 @@ import { env } from "../../../config/env.js";
 
 import { NotFoundError } from "../../../shared/errors/NotFoundErrror.js";
 
+import { googleOAuthClient } from "../config/google.config.js";
+
+import { UserRole } from "../constants/roles.js";
+
 export class AuthService {
   /*
+   * --------------------------------------------------------------------------
    * REGISTER
+   * --------------------------------------------------------------------------
    */
+
   async register(data: {
     firstName: string;
     lastName: string;
     email: string;
+    phoneNumber: string;
     password: string;
   }) {
     const existingUser = await authRepository.findUserByEmail(data.email);
@@ -49,6 +57,8 @@ export class AuthService {
     const user = await authRepository.createUser({
       ...data,
       password: hashedPassword,
+      authProvider: "LOCAL",
+      providerId: null,
     });
 
     const verificationToken = generateToken();
@@ -73,8 +83,11 @@ export class AuthService {
   }
 
   /*
+   * --------------------------------------------------------------------------
    * VERIFY EMAIL
+   * --------------------------------------------------------------------------
    */
+
   async verifyEmail(token: string) {
     const verification = await authRepository.findEmailVerification(token);
 
@@ -94,41 +107,27 @@ export class AuthService {
   }
 
   /*
-   * LOGIN
+   * --------------------------------------------------------------------------
+   * CREATE AUTH SESSION
+   *
+   * Shared by:
+   * - Local login
+   * - Google login
+   *
+   * Generates:
+   * - Access token
+   * - Refresh token
+   *
+   * Stores refresh token in database.
+   * --------------------------------------------------------------------------
    */
-  async login(email: string, password: string) {
-    console.log("🔐 LOGIN ATTEMPT:", email);
 
-    const user = await authRepository.findUserByEmailForLogin(email);
-
-    console.log("👤 USER FOUND:", !!user);
-
+  private async createAuthSession(user: any) {
     if (!user) {
-      console.log("❌ USER NOT FOUND");
-      throw new UnauthorizedError("Invalid email or password.");
-    }
-
-    const isPasswordValid = await comparePassword(password, user.password);
-
-    console.log("🔑 PASSWORD VALID:", isPasswordValid);
-    console.log("📧 EMAIL VERIFIED:", user.isEmailVerified);
-    console.log("🟢 ACCOUNT STATUS:", user.accountStatus);
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedError("Invalid email or password.");
-    }
-
-    if (!user.isEmailVerified) {
-      console.log("❌ EMAIL NOT VERIFIED");
-
-      throw new UnauthorizedError(
-        "Please verify your email before logging in.",
-      );
+      throw new UnauthorizedError("Unable to create authentication session.");
     }
 
     if (user.accountStatus !== "ACTIVE") {
-      console.log("❌ ACCOUNT NOT ACTIVE");
-
       throw new UnauthorizedError("Your account is not active.");
     }
 
@@ -141,27 +140,32 @@ export class AuthService {
       userId: user.id,
     });
 
+    const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
     await authRepository.createRefreshToken({
       userId: user.id,
       token: refreshToken,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + THIRTY_DAYS_MS),
     });
 
-    await authRepository.updateUser(user.id, {
+    const updatedUser = await authRepository.updateUser(user.id, {
       lastLoginAt: new Date(),
     });
 
-    const safeUser = {
+    const safeUser = updatedUser ?? {
       _id: user._id,
+      id: user.id,
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
       phoneNumber: user.phoneNumber,
+      authProvider: user.authProvider,
+      providerId: user.providerId,
       role: user.role,
       isEmailVerified: user.isEmailVerified,
       accountStatus: user.accountStatus,
       profileImage: user.profileImage,
-      lastLoginAt: user.lastLoginAt,
+      lastLoginAt: new Date(),
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };
@@ -174,12 +178,305 @@ export class AuthService {
   }
 
   /*
-   * FORGOT PASSWORD
+   * --------------------------------------------------------------------------
+   * LOGIN
+   *
+   * LOCAL / EMAIL + PASSWORD LOGIN
+   * --------------------------------------------------------------------------
    */
+
+  async login(email: string, password: string) {
+    const user = await authRepository.findUserByEmailForLogin(email);
+
+    if (!user) {
+      throw new UnauthorizedError("Invalid email or password.");
+    }
+
+    /*
+     * Google accounts do not have a local password.
+     */
+    if (user.authProvider === "GOOGLE" || !user.password) {
+      throw new UnauthorizedError(
+        "This account uses Google login. Please continue with Google.",
+      );
+    }
+
+    const isPasswordValid = await comparePassword(password, user.password);
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedError("Invalid email or password.");
+    }
+
+    if (!user.isEmailVerified) {
+      throw new UnauthorizedError(
+        "Please verify your email before logging in.",
+      );
+    }
+
+    if (user.accountStatus !== "ACTIVE") {
+      throw new UnauthorizedError("Your account is not active.");
+    }
+
+    return this.createAuthSession(user);
+  }
+
+  /*
+   * --------------------------------------------------------------------------
+   * GOOGLE AUTHORIZATION URL
+   * --------------------------------------------------------------------------
+   *
+   * This generates the Google OAuth consent/login URL.
+   *
+   * Browser flow:
+   *
+   * Frontend
+   *    ↓
+   * GET /api/v1/auth/google
+   *    ↓
+   * Backend
+   *    ↓
+   * Google
+   */
+
+  getGoogleAuthorizationUrl() {
+    return googleOAuthClient.generateAuthUrl({
+      access_type: "offline",
+      prompt: "select_account",
+      scope: ["openid", "email", "profile"],
+    });
+  }
+
+  /*
+   * --------------------------------------------------------------------------
+   * GOOGLE CALLBACK
+   * --------------------------------------------------------------------------
+   *
+   * Google redirects here after successful authentication.
+   *
+   * Steps:
+   *
+   * 1. Exchange authorization code for Google tokens.
+   * 2. Verify Google's ID token.
+   * 3. Read Google user information.
+   * 4. Find existing Google account.
+   * 5. Find existing email account.
+   * 6. Create new Google account if necessary.
+   * 7. Create FreshFold authentication session.
+   */
+
+  async googleCallback(code: string) {
+    if (!code) {
+      throw new UnauthorizedError("Google authorization code is required.");
+    }
+
+    /*
+     * Exchange authorization code for Google tokens.
+     */
+    let tokens;
+
+    try {
+      const response = await googleOAuthClient.getToken(code);
+
+      tokens = response.tokens;
+    } catch (error) {
+      console.error("Google token exchange failed:", error);
+
+      throw new UnauthorizedError(
+        "Unable to authenticate with Google. Please try again.",
+      );
+    }
+
+    if (!tokens.id_token) {
+      throw new UnauthorizedError(
+        "Google authentication failed. ID token was not provided.",
+      );
+    }
+
+    /*
+     * Verify Google ID token.
+     */
+    let payload;
+
+    try {
+      const ticket = await googleOAuthClient.verifyIdToken({
+        idToken: tokens.id_token,
+        audience: env.GOOGLE_CLIENT_ID,
+      });
+
+      payload = ticket.getPayload();
+    } catch (error) {
+      console.error("Google ID token verification failed:", error);
+
+      throw new UnauthorizedError(
+        "Unable to verify your Google account. Please try again.",
+      );
+    }
+
+    if (!payload) {
+      throw new UnauthorizedError(
+        "Unable to retrieve Google account information.",
+      );
+    }
+
+    /*
+     * Google provider ID.
+     *
+     * `sub` is Google's unique identifier for the user.
+     */
+    const providerId = payload.sub;
+
+    if (!providerId) {
+      throw new UnauthorizedError("Google account ID was not provided.");
+    }
+
+    /*
+     * Google email.
+     */
+    const email = payload.email?.trim().toLowerCase();
+
+    if (!email) {
+      throw new UnauthorizedError("Google account email was not provided.");
+    }
+
+    /*
+     * Google should verify the email.
+     */
+    if (!payload.email_verified) {
+      throw new UnauthorizedError(
+        "Your Google email address could not be verified.",
+      );
+    }
+
+    /*
+     * User profile information from Google.
+     */
+    const firstName =
+      payload.given_name?.trim() ||
+      payload.name?.split(" ")[0]?.trim() ||
+      "User";
+
+    const lastName =
+      payload.family_name?.trim() ||
+      payload.name?.split(" ").slice(1).join(" ").trim() ||
+      "";
+
+    const profileImage = payload.picture ?? null;
+
+    /*
+     * ------------------------------------------------------------------------
+     * CASE 1
+     *
+     * Existing Google account.
+     * ------------------------------------------------------------------------
+     */
+
+    let user = await authRepository.findUserByProviderId(providerId);
+
+    if (user) {
+      if (user.accountStatus === "SUSPENDED") {
+        throw new UnauthorizedError(
+          "This account has been suspended. Please contact support.",
+        );
+      }
+
+      if (user.accountStatus !== "ACTIVE") {
+        throw new UnauthorizedError("Your account is not active.");
+      }
+
+      /*
+       * Update Google profile information.
+       */
+      user =
+        (await authRepository.updateUser(user.id, {
+          firstName,
+          lastName,
+          profileImage,
+          isEmailVerified: true,
+        })) ?? user;
+
+      return this.createAuthSession(user);
+    }
+
+    /*
+     * ------------------------------------------------------------------------
+     * CASE 2
+     *
+     * Existing FreshFold account with same email.
+     *
+     * We do NOT automatically link Google to an existing LOCAL account.
+     *
+     * This prevents accidental account linking.
+     * ------------------------------------------------------------------------
+     */
+
+    const existingEmailUser = await authRepository.findUserByEmail(email);
+
+    if (existingEmailUser) {
+      if (existingEmailUser.authProvider === "LOCAL") {
+        throw new ValidationError(
+          "An account with this email already exists. Please sign in using your email and password.",
+        );
+      }
+
+      /*
+       * Unexpected provider state.
+       */
+      throw new ValidationError(
+        "An account with this email already exists. Please use the original sign-in method.",
+      );
+    }
+
+    /*
+     * ------------------------------------------------------------------------
+     * CASE 3
+     *
+     * Create a new Google account.
+     * ------------------------------------------------------------------------
+     */
+
+    user = await authRepository.createUser({
+      firstName,
+      lastName,
+      email,
+      phoneNumber: null,
+      authProvider: "GOOGLE",
+      providerId,
+      role: UserRole.USER,
+      isEmailVerified: true,
+      accountStatus: "ACTIVE",
+      profileImage,
+      lastLoginAt: new Date(),
+    });
+
+    /*
+     * Create FreshFold authentication session.
+     */
+    return this.createAuthSession(user);
+  }
+
+  /*
+   * --------------------------------------------------------------------------
+   * FORGOT PASSWORD
+   * --------------------------------------------------------------------------
+   */
+
   async forgotPassword(email: string) {
     const user = await authRepository.findUserByEmail(email);
 
+    /*
+     * Always return the same response when the account
+     * does not exist.
+     */
     if (!user) {
+      return {
+        message: "If an account exists, a password reset email has been sent.",
+      };
+    }
+
+    /*
+     * Google accounts do not have a local password.
+     */
+    if (user.authProvider === "GOOGLE" || !user.password) {
       return {
         message: "If an account exists, a password reset email has been sent.",
       };
@@ -206,8 +503,11 @@ export class AuthService {
   }
 
   /*
+   * --------------------------------------------------------------------------
    * RESET PASSWORD
+   * --------------------------------------------------------------------------
    */
+
   async resetPassword(token: string, password: string) {
     const passwordReset = await authRepository.findPasswordReset(token);
 
@@ -219,13 +519,38 @@ export class AuthService {
       throw new ValidationError("Reset link has expired");
     }
 
+    const user = await authRepository.findUserById(
+      passwordReset.userId.toString(),
+    );
+
+    if (!user) {
+      throw new NotFoundError("User not found.");
+    }
+
+    /*
+     * Google accounts should continue using Google authentication.
+     */
+    if (user.authProvider === "GOOGLE" || !user.password) {
+      throw new ValidationError(
+        "This account uses Google login. Password reset is not available.",
+      );
+    }
+
     const hashedPassword = await hashPassword(password);
 
-    await authRepository.updateUser(passwordReset.userId.toString(), {
+    await authRepository.updateUser(user.id, {
       password: hashedPassword,
     });
 
+    /*
+     * Remove used reset token.
+     */
     await authRepository.deletePasswordReset(token);
+
+    /*
+     * Invalidate all existing sessions after password reset.
+     */
+    await authRepository.deleteAllRefreshTokens(user.id);
 
     return {
       message: "Password reset successfully.",
@@ -233,21 +558,22 @@ export class AuthService {
   }
 
   /*
+   * --------------------------------------------------------------------------
    * REFRESH TOKEN
+   * --------------------------------------------------------------------------
    */
-  async refreshToken(refreshToken: string) {
-    /* ---------------------------------------------------------------------- */
-    /*                         VALIDATE TOKEN                                  */
-    /* ---------------------------------------------------------------------- */
 
+  async refreshToken(refreshToken: string) {
+    /*
+     * Validate token exists.
+     */
     if (!refreshToken) {
       throw new UnauthorizedError("Refresh token is required.");
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*                         VERIFY JWT                                     */
-    /* ---------------------------------------------------------------------- */
-
+    /*
+     * Verify JWT.
+     */
     try {
       verifyRefreshToken(refreshToken);
     } catch (error) {
@@ -262,51 +588,49 @@ export class AuthService {
       throw error;
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*                    FIND ACTIVE SESSION                                 */
-    /* ---------------------------------------------------------------------- */
-
+    /*
+     * Find active session.
+     */
     const session = await authRepository.findRefreshToken(refreshToken);
 
     if (!session) {
       throw new UnauthorizedError("Invalid refresh token.");
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*                         FIND USER                                      */
-    /* ---------------------------------------------------------------------- */
-
+    /*
+     * Find user.
+     */
     const user = await authRepository.findUserById(session.userId.toString());
 
     if (!user) {
       throw new UnauthorizedError("User not found.");
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*                     CHECK ACCOUNT STATUS                               */
-    /* ---------------------------------------------------------------------- */
-
+    /*
+     * Check account status.
+     */
     if (user.accountStatus !== "ACTIVE") {
       throw new UnauthorizedError("Account is inactive.");
     }
 
-    /* ---------------------------------------------------------------------- */
-    /*                       GENERATE TOKENS                                  */
-    /* ---------------------------------------------------------------------- */
-
+    /*
+     * Generate new access token.
+     */
     const newAccessToken = generateAccessToken({
       userId: user.id,
       role: user.role,
     });
 
+    /*
+     * Generate new refresh token.
+     */
     const newRefreshToken = generateRefreshToken({
       userId: user.id,
     });
 
-    /* ---------------------------------------------------------------------- */
-    /*                     ROTATE REFRESH TOKEN                               */
-    /* ---------------------------------------------------------------------- */
-
+    /*
+     * Rotate refresh token.
+     */
     await authRepository.deleteRefreshToken(refreshToken);
 
     const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -317,10 +641,9 @@ export class AuthService {
       expiresAt: new Date(Date.now() + THIRTY_DAYS_MS),
     });
 
-    /* ---------------------------------------------------------------------- */
-    /*                           RETURN TOKENS                                */
-    /* ---------------------------------------------------------------------- */
-
+    /*
+     * Return tokens.
+     */
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
@@ -328,9 +651,16 @@ export class AuthService {
   }
 
   /*
+   * --------------------------------------------------------------------------
    * LOGOUT
+   * --------------------------------------------------------------------------
    */
+
   async logout(refreshToken: string) {
+    if (!refreshToken) {
+      throw new UnauthorizedError("Refresh token is required.");
+    }
+
     const existingToken = await authRepository.findRefreshToken(refreshToken);
 
     if (!existingToken) {
@@ -345,8 +675,11 @@ export class AuthService {
   }
 
   /*
+   * --------------------------------------------------------------------------
    * LOGOUT ALL
+   * --------------------------------------------------------------------------
    */
+
   async logoutAll(userId: string) {
     const user = await authRepository.findUserById(userId);
 
@@ -362,8 +695,11 @@ export class AuthService {
   }
 
   /*
+   * --------------------------------------------------------------------------
    * ME
+   * --------------------------------------------------------------------------
    */
+
   async me(userId: string) {
     const user = await authRepository.findUserById(userId);
 

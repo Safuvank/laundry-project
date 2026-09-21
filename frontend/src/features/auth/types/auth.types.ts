@@ -26,9 +26,9 @@ export interface ResetPasswordRequest {
   confirmPassword: string;
 }
 
-// ----------------------------------
-// Authentication User
-// ----------------------------------
+/* -------------------------------------------------------------------------- */
+/*                              AUTH USER                                     */
+/* -------------------------------------------------------------------------- */
 
 export interface AuthUser {
   _id: string;
@@ -37,7 +37,23 @@ export interface AuthUser {
   lastName: string;
 
   email: string;
-  phoneNumber?: string;
+
+  phoneNumber: string | null;
+
+  /*
+   * Authentication provider.
+   *
+   * LOCAL  → email/password
+   * GOOGLE → Google OAuth
+   */
+  authProvider: "LOCAL" | "GOOGLE";
+
+  /*
+   * Google `sub` value for Google accounts.
+   *
+   * LOCAL accounts have null.
+   */
+  providerId: string | null;
 
   role: "USER" | "ADMIN" | "DELIVERY_AGENT";
 
@@ -45,20 +61,22 @@ export interface AuthUser {
 
   accountStatus: "ACTIVE" | "SUSPENDED" | "BLOCKED";
 
-  profileImage?: string | null;
+  profileImage: string | null;
 
-  lastLoginAt?: string | null;
+  lastLoginAt: string | null;
 
   createdAt: string;
+
   updatedAt: string;
 }
 
-// ----------------------------------
-// Login Response
-// ----------------------------------
+/* -------------------------------------------------------------------------- */
+/*                              LOGIN RESPONSE                                */
+/* -------------------------------------------------------------------------- */
 
 export interface LoginResponse {
   success: boolean;
+
   message: string;
 
   data: {
@@ -67,12 +85,38 @@ export interface LoginResponse {
   };
 }
 
-// ----------------------------------
-// Generic Auth Response
-// ----------------------------------
+/* -------------------------------------------------------------------------- */
+/*                              ME RESPONSE                                   */
+/* -------------------------------------------------------------------------- */
+
+export interface MeResponse {
+  success: boolean;
+
+  data: AuthUser;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                         REFRESH TOKEN RESPONSE                             */
+/* -------------------------------------------------------------------------- */
+
+export interface RefreshTokenResponse {
+  success: boolean;
+
+  message: string;
+
+  data: {
+    accessToken: string;
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*                            GENERIC RESPONSE                                */
+/* -------------------------------------------------------------------------- */
 
 export interface AuthResponse {
   success: boolean;
+
   message: string;
+
   data?: unknown;
 }

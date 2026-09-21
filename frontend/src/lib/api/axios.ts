@@ -8,9 +8,15 @@ import { useAuthStore } from "@/stores/auth.store";
 
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
+
   headers: {
     "Content-Type": "application/json",
   },
+
+  /*
+   * Required because the refresh token is stored
+   * inside an HttpOnly cookie.
+   */
   withCredentials: true,
 });
 
@@ -21,14 +27,29 @@ export const api = axios.create({
 /**
  * Separate Axios instance for refreshing the access token.
  *
- * This prevents the refresh request itself from entering the normal
- * response interceptor and creating a refresh loop.
+ * This prevents:
+ *
+ * /auth/refresh
+ *      ↓
+ * 401
+ *      ↓
+ * interceptor
+ *      ↓
+ * /auth/refresh
+ *      ↓
+ * infinite loop
+ *
+ * The refresh request therefore bypasses the normal
+ * `api` response interceptor.
  */
+
 const refreshApi = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
+
   headers: {
     "Content-Type": "application/json",
   },
+
   withCredentials: true,
 });
 
@@ -44,14 +65,22 @@ let failedQueue: Array<{
 }> = [];
 
 /* -------------------------------------------------------------------------- */
-/*                            PROCESS QUEUE                                    */
+/*                            PROCESS QUEUE                                   */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Resolve or reject requests that were waiting
+ * while another request was refreshing the token.
+ */
 
 const processQueue = (error: unknown, token: string | null): void => {
   failedQueue.forEach((promise) => {
     if (error) {
       promise.reject(error);
-    } else if (token) {
+      return;
+    }
+
+    if (token) {
       promise.resolve(token);
     }
   });
@@ -60,12 +89,16 @@ const processQueue = (error: unknown, token: string | null): void => {
 };
 
 /* -------------------------------------------------------------------------- */
-/*                         REQUEST INTERCEPTOR                                 */
+/*                         REQUEST INTERCEPTOR                                */
 /* -------------------------------------------------------------------------- */
 
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const accessToken = useAuthStore.getState().accessToken;
+
+    /*
+     * Attach access token to authenticated requests.
+     */
 
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
@@ -80,7 +113,7 @@ api.interceptors.request.use(
 );
 
 /* -------------------------------------------------------------------------- */
-/*                         RESPONSE INTERCEPTOR                                */
+/*                         RESPONSE INTERCEPTOR                               */
 /* -------------------------------------------------------------------------- */
 
 api.interceptors.response.use(
@@ -95,9 +128,10 @@ api.interceptors.response.use(
         })
       | undefined;
 
-    /* ---------------------------------------------------------------------- */
-    /*                         INVALID REQUEST                                */
-    /* ---------------------------------------------------------------------- */
+    /*
+     * If Axios does not provide the original request,
+     * we cannot safely retry it.
+     */
 
     if (!originalRequest) {
       return Promise.reject(error);
@@ -106,8 +140,21 @@ api.interceptors.response.use(
     const requestUrl = originalRequest.url ?? "";
 
     /* ---------------------------------------------------------------------- */
-    /*                         AUTH ENDPOINTS                                  */
+    /*                         AUTH ENDPOINTS                                 */
     /* ---------------------------------------------------------------------- */
+
+    /*
+     * These endpoints should not automatically trigger
+     * another refresh attempt.
+     *
+     * Especially important for:
+     *
+     * /auth/refresh
+     * /auth/login
+     * /auth/register
+     * /auth/google
+     * /auth/google/callback
+     */
 
     const isAuthRequest =
       requestUrl.includes("/auth/login") ||
@@ -117,10 +164,12 @@ api.interceptors.response.use(
       requestUrl.includes("/auth/reset-password") ||
       requestUrl.includes("/auth/refresh") ||
       requestUrl.includes("/auth/logout") ||
-      requestUrl.includes("/auth/logout-all");
+      requestUrl.includes("/auth/logout-all") ||
+      requestUrl.includes("/auth/google") ||
+      requestUrl.includes("/auth/me");
 
     /* ---------------------------------------------------------------------- */
-    /*                     SHOULD NOT REFRESH                                  */
+    /*                     SHOULD NOT REFRESH                                */
     /* ---------------------------------------------------------------------- */
 
     if (
@@ -132,7 +181,7 @@ api.interceptors.response.use(
     }
 
     /* ---------------------------------------------------------------------- */
-    /*                  ANOTHER REFRESH IS ALREADY RUNNING                     */
+    /*                  ANOTHER REFRESH IS ALREADY RUNNING                    */
     /* ---------------------------------------------------------------------- */
 
     if (isRefreshing) {
@@ -149,20 +198,25 @@ api.interceptors.response.use(
     }
 
     /* ---------------------------------------------------------------------- */
-    /*                         START TOKEN REFRESH                             */
+    /*                         START TOKEN REFRESH                            */
     /* ---------------------------------------------------------------------- */
 
     originalRequest._retry = true;
+
     isRefreshing = true;
 
     try {
-      /**
+      /*
        * IMPORTANT:
+       *
        * Use refreshApi instead of api.
        *
-       * The refresh token is expected to be stored in an HttpOnly cookie.
-       * withCredentials: true sends that cookie to the backend.
+       * The refresh token is stored in an HttpOnly cookie.
+       *
+       * withCredentials: true causes the browser to send
+       * that cookie to the backend.
        */
+
       const response = await refreshApi.post<{
         success: boolean;
         message: string;
@@ -197,7 +251,7 @@ api.interceptors.response.use(
 
       return api(originalRequest);
     } catch (refreshError) {
-      console.error("❌ Token refresh failed.", refreshError);
+      console.error("Token refresh failed.", refreshError);
 
       /* -------------------------------------------------------------------- */
       /*                     REJECT QUEUED REQUESTS                           */
@@ -206,7 +260,7 @@ api.interceptors.response.use(
       processQueue(refreshError, null);
 
       /* -------------------------------------------------------------------- */
-      /*                         CLEAR AUTH                                    */
+      /*                         CLEAR AUTH                                   */
       /* -------------------------------------------------------------------- */
 
       useAuthStore.getState().clearAuth();

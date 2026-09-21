@@ -32,7 +32,7 @@ export class UserRepository {
   */
 
   async findById(userId: string) {
-    return User.findById(userId);
+    return User.findById(userId).select("-password");
   }
 
   /*
@@ -43,8 +43,9 @@ export class UserRepository {
 
   async updateProfile(userId: string, data: Partial<IUser>) {
     return User.findByIdAndUpdate(userId, data, {
-      returnDocument: "after",
-    });
+      new: true,
+      runValidators: true,
+    }).select("-password");
   }
 
   /*
@@ -60,9 +61,10 @@ export class UserRepository {
         password,
       },
       {
-        returnDocument: "after",
+        new: true,
+        runValidators: true,
       },
-    );
+    ).select("-password");
   }
 
   /*
@@ -78,9 +80,10 @@ export class UserRepository {
         profileImage,
       },
       {
-        returnDocument: "after",
+        new: true,
+        runValidators: true,
       },
-    );
+    ).select("-password");
   }
 
   /*
@@ -96,9 +99,10 @@ export class UserRepository {
         accountStatus: "SUSPENDED",
       },
       {
-        returnDocument: "after",
+        new: true,
+        runValidators: true,
       },
-    );
+    ).select("-password");
   }
 }
 

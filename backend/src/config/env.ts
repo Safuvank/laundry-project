@@ -13,7 +13,21 @@ export const env = {
 
   REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET || "",
 
-  //mail
+  // --------------------------------------------------------------------------
+  // Google OAuth
+  // --------------------------------------------------------------------------
+
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || "",
+
+  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || "",
+
+  GOOGLE_CALLBACK_URL:
+    process.env.GOOGLE_CALLBACK_URL ||
+    "http://localhost:5000/api/v1/auth/google/callback",
+
+  // --------------------------------------------------------------------------
+  // Mail
+  // --------------------------------------------------------------------------
 
   SMTP_HOST: process.env.SMTP_HOST || "",
 
@@ -26,6 +40,10 @@ export const env = {
   SMTP_PASS: process.env.SMTP_PASS || "",
 
   MAIL_FROM: process.env.MAIL_FROM || "",
+
+  // --------------------------------------------------------------------------
+  // Frontend
+  // --------------------------------------------------------------------------
 
   FRONTEND_URL: process.env.FRONTEND_URL || "",
 };
