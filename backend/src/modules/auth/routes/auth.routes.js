@@ -70,16 +70,20 @@ router.patch("/me", authenticate, validateRequest(updateProfileSchema), userCont
 |--------------------------------------------------------------------------
 | GOOGLE OAUTH
 |--------------------------------------------------------------------------
-|
-| These routes will be added after the Google OAuth
-| configuration, service, and controller are implemented.
-|
-| Planned routes:
-|
-| GET /google
-| GET /google/callback
-|
-|--------------------------------------------------------------------------
 */
+/*
+ * Step 1:
+ * Redirect the user to Google's OAuth consent screen.
+ *
+ * GET /api/v1/auth/google
+ */
+router.get("/google", authController.googleLogin);
+/*
+ * Step 2:
+ * Google redirects the user back here after authentication.
+ *
+ * GET /api/v1/auth/google/callback
+ */
+router.get("/google/callback", authController.googleCallback);
 export default router;
 //# sourceMappingURL=auth.routes.js.map
