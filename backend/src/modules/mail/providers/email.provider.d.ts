@@ -1,4 +1,4 @@
-import type { IEmail } from "../interfaces/IEmail.js";
+import type { IEmail } from "../interfaces/IEmail.ts";
 export declare class SMTPProvider {
     private transporter;
     constructor();

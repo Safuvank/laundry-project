@@ -3,11 +3,23 @@ import dotenv from "dotenv";
 dotenv.config();
 
 export const env = {
+  // --------------------------------------------------------------------------
+  // Server
+  // --------------------------------------------------------------------------
+
   PORT: process.env.PORT || "5000",
 
   NODE_ENV: process.env.NODE_ENV || "development",
 
+  // --------------------------------------------------------------------------
+  // Database
+  // --------------------------------------------------------------------------
+
   MONGODB_URI: process.env.MONGODB_URI || "",
+
+  // --------------------------------------------------------------------------
+  // Authentication
+  // --------------------------------------------------------------------------
 
   ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET || "",
 
@@ -26,18 +38,10 @@ export const env = {
     "http://localhost:5000/api/v1/auth/google/callback",
 
   // --------------------------------------------------------------------------
-  // Mail
+  // Email - Resend
   // --------------------------------------------------------------------------
 
-  SMTP_HOST: process.env.SMTP_HOST || "",
-
-  SMTP_PORT: Number(process.env.SMTP_PORT) || 587,
-
-  SMTP_SECURE: process.env.SMTP_SECURE === "true",
-
-  SMTP_USER: process.env.SMTP_USER || "",
-
-  SMTP_PASS: process.env.SMTP_PASS || "",
+  RESEND_API_KEY: process.env.RESEND_API_KEY || "",
 
   MAIL_FROM: process.env.MAIL_FROM || "",
 

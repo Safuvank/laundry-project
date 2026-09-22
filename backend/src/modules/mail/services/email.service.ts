@@ -1,4 +1,4 @@
-import { smtpProvider } from "../providers/smtp.provider.js";
+import { emailProvider } from "../providers/email.provider.js";
 
 import { verifyEmailTemplate } from "../templates/verifyEmail.js";
 
@@ -15,17 +15,13 @@ export class EmailService {
       verificationUrl: data.verificationUrl,
     });
 
-    await smtpProvider.send({
+    await emailProvider.send({
       to: data.email,
-
       subject: "Verify Your Email Address",
-
       html,
     });
   }
 
-
-  
   async sendForgotPasswordEmail(data: {
     firstName: string;
     email: string;
@@ -36,7 +32,7 @@ export class EmailService {
       resetPasswordUrl: data.resetPasswordUrl,
     });
 
-    await smtpProvider.send({
+    await emailProvider.send({
       to: data.email,
       subject: "Reset Your Password",
       html,
