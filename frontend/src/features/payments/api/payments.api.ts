@@ -10,6 +10,15 @@ import type {
 } from "../types/payment.type";
 
 /* -------------------------------------------------------------------------- */
+/*                              RESPONSE TYPES                               */
+/* -------------------------------------------------------------------------- */
+
+interface ApiErrorResponse {
+  success?: boolean;
+  message?: string;
+}
+
+/* -------------------------------------------------------------------------- */
 /*                         CREATE FRESHFOLD PAYMENT                           */
 /* -------------------------------------------------------------------------- */
 
@@ -18,14 +27,36 @@ import type {
  *
  * POST /api/v1/payments
  *
- * The backend gets the payment amount from order.finalPrice.
+ * The backend calculates the payment amount from:
+ *
+ * Order
+ *   ↓
+ * order.finalPrice
+ *
+ * The frontend does NOT send the amount.
  */
 export const createPayment = async (
   payload: CreatePaymentPayload,
 ): Promise<Payment> => {
-  const response = await api.post<PaymentResponse>("/payments", payload);
+  if (!payload.orderId) {
+    throw new Error("Order ID is required.");
+  }
 
-  return response.data.data;
+  if (!payload.paymentMethod) {
+    throw new Error("Payment method is required.");
+  }
+
+  try {
+    const response = await api.post<PaymentResponse>("/payments", payload);
+
+    if (!response.data?.data) {
+      throw new Error("Payment was created but no payment data was returned.");
+    }
+
+    return response.data.data;
+  } catch (error) {
+    throw normalizePaymentError(error, "Unable to create payment.");
+  }
 };
 
 /* -------------------------------------------------------------------------- */
@@ -42,10 +73,22 @@ export const getPaymentById = async (paymentId: string): Promise<Payment> => {
     throw new Error("Payment ID is required.");
   }
 
-  const response = await api.get<PaymentResponse>(`/payments/${paymentId}`);
+  try {
+    const response = await api.get<PaymentResponse>(`/payments/${paymentId}`);
 
-  return response.data.data;
+    if (!response.data?.data) {
+      throw new Error("Payment information was not returned.");
+    }
+
+    return response.data.data;
+  } catch (error) {
+    throw normalizePaymentError(error, "Unable to retrieve payment.");
+  }
 };
+
+/* -------------------------------------------------------------------------- */
+/*                         GET PAYMENT BY ORDER                               */
+/* -------------------------------------------------------------------------- */
 
 /**
  * Get payment by order ID.
@@ -59,10 +102,27 @@ export const getPaymentByOrderId = async (
     throw new Error("Order ID is required.");
   }
 
-  const response = await api.get<PaymentResponse>(`/payments/order/${orderId}`);
+  try {
+    const response = await api.get<PaymentResponse>(
+      `/payments/order/${orderId}`,
+    );
 
-  return response.data.data;
+    if (!response.data?.data) {
+      throw new Error("Payment information was not returned.");
+    }
+
+    return response.data.data;
+  } catch (error) {
+    throw normalizePaymentError(
+      error,
+      "Unable to retrieve payment for this order.",
+    );
+  }
 };
+
+/* -------------------------------------------------------------------------- */
+/*                         GET MY PAYMENTS                                    */
+/* -------------------------------------------------------------------------- */
 
 /**
  * Get all payments belonging to the logged-in customer.
@@ -70,13 +130,17 @@ export const getPaymentByOrderId = async (
  * GET /api/v1/payments/my-payments
  */
 export const getMyPayments = async (): Promise<Payment[]> => {
-  const response = await api.get<PaymentsResponse>("/payments/my-payments");
+  try {
+    const response = await api.get<PaymentsResponse>("/payments/my-payments");
 
-  return response.data.data;
+    return response.data?.data ?? [];
+  } catch (error) {
+    throw normalizePaymentError(error, "Unable to retrieve payments.");
+  }
 };
 
 /* -------------------------------------------------------------------------- */
-/*                         RAZORPAY PAYMENT FLOW                             */
+/*                         RAZORPAY PAYMENT FLOW                              */
 /* -------------------------------------------------------------------------- */
 
 export interface CreateRazorpayOrderData {
@@ -100,14 +164,28 @@ export interface CreateRazorpayOrderResponse {
  * POST /api/v1/payments/:id/razorpay-order
  *
  * IMPORTANT:
- * The frontend does NOT send the amount.
  *
- * Backend:
+ * The frontend does NOT send:
+ *
+ * - amount
+ * - currency
+ * - Razorpay order ID
+ *
+ * The backend gets the amount from:
+ *
  * FreshFold Payment
+ *       ↓
+ * Order
  *       ↓
  * order.finalPrice
  *       ↓
  * Razorpay Order
+ *
+ * Authentication:
+ *
+ * Axios automatically attaches:
+ *
+ * Authorization: Bearer <accessToken>
  */
 export const createRazorpayOrder = async (
   paymentId: string,
@@ -116,11 +194,33 @@ export const createRazorpayOrder = async (
     throw new Error("Payment ID is required.");
   }
 
-  const response = await api.post<CreateRazorpayOrderResponse>(
-    `/payments/${paymentId}/razorpay-order`,
-  );
+  try {
+    const response = await api.post<CreateRazorpayOrderResponse>(
+      `/payments/${paymentId}/razorpay-order`,
+    );
 
-  return response.data.data;
+    const data = response.data?.data;
+
+    if (!data) {
+      throw new Error("Razorpay order was not created.");
+    }
+
+    if (!data.gatewayOrderId) {
+      throw new Error("Razorpay order ID was not returned by the server.");
+    }
+
+    if (!data.amountInPaise || data.amountInPaise <= 0) {
+      throw new Error("Invalid Razorpay payment amount.");
+    }
+
+    if (!data.currency) {
+      throw new Error("Razorpay currency was not returned by the server.");
+    }
+
+    return data;
+  } catch (error) {
+    throw normalizePaymentError(error, "Unable to create Razorpay order.");
+  }
 };
 
 /* -------------------------------------------------------------------------- */
@@ -153,17 +253,30 @@ export interface VerifyRazorpayPaymentResponse {
  *
  * POST /api/v1/payments/:id/verify
  *
- * The frontend sends the values returned by Razorpay Checkout.
+ * Razorpay Checkout returns:
  *
- * Backend verifies:
- * - payment ownership
- * - payment status
- * - Razorpay order ID
- * - Razorpay signature
+ * razorpay_payment_id
+ * razorpay_order_id
+ * razorpay_signature
  *
- * Then:
- * Payment → SUCCESS
- * Order.paymentStatus → PAID
+ * The frontend sends those values to the backend.
+ *
+ * The backend then verifies:
+ *
+ * 1. Payment ownership
+ * 2. Payment status
+ * 3. Razorpay order ID
+ * 4. Razorpay signature
+ *
+ * On success:
+ *
+ * Payment
+ *    ↓
+ * SUCCESS
+ *
+ * Order.paymentStatus
+ *    ↓
+ * PAID
  */
 export const verifyRazorpayPayment = async (
   paymentId: string,
@@ -185,12 +298,24 @@ export const verifyRazorpayPayment = async (
     throw new Error("Razorpay payment signature is required.");
   }
 
-  const response = await api.post<VerifyRazorpayPaymentResponse>(
-    `/payments/${paymentId}/verify`,
-    payload,
-  );
+  try {
+    const response = await api.post<VerifyRazorpayPaymentResponse>(
+      `/payments/${paymentId}/verify`,
+      payload,
+    );
 
-  return response.data.data;
+    const data = response.data?.data;
+
+    if (!data) {
+      throw new Error(
+        "Payment verification completed but no payment data was returned.",
+      );
+    }
+
+    return data;
+  } catch (error) {
+    throw normalizePaymentError(error, "Payment verification failed.");
+  }
 };
 
 /* -------------------------------------------------------------------------- */
@@ -202,9 +327,19 @@ export const verifyRazorpayPayment = async (
  *
  * PATCH /api/v1/payments/:id/initiate
  *
- * Kept for the existing/manual payment flow.
+ * This endpoint is still used by the current
+ * FreshFold payment flow before Razorpay Checkout.
  *
- * Razorpay should use:
+ * Flow:
+ *
+ * FreshFold Payment
+ *       ↓
+ * initiatePayment()
+ *       ↓
+ * Razorpay Checkout
+ *
+ * Razorpay order creation is handled separately by:
+ *
  * createRazorpayOrder()
  */
 export const initiatePayment = async (paymentId: string): Promise<Payment> => {
@@ -212,11 +347,19 @@ export const initiatePayment = async (paymentId: string): Promise<Payment> => {
     throw new Error("Payment ID is required.");
   }
 
-  const response = await api.patch<PaymentResponse>(
-    `/payments/${paymentId}/initiate`,
-  );
+  try {
+    const response = await api.patch<PaymentResponse>(
+      `/payments/${paymentId}/initiate`,
+    );
 
-  return response.data.data;
+    if (!response.data?.data) {
+      throw new Error("Payment initiation did not return payment data.");
+    }
+
+    return response.data.data;
+  } catch (error) {
+    throw normalizePaymentError(error, "Unable to initiate payment.");
+  }
 };
 
 /* -------------------------------------------------------------------------- */
@@ -238,12 +381,20 @@ export const markPaymentSuccess = async (
     throw new Error("Payment ID is required.");
   }
 
-  const response = await api.patch<PaymentResponse>(
-    `/payments/${paymentId}/success`,
-    payload,
-  );
+  try {
+    const response = await api.patch<PaymentResponse>(
+      `/payments/${paymentId}/success`,
+      payload,
+    );
 
-  return response.data.data;
+    if (!response.data?.data) {
+      throw new Error("Payment success response did not contain payment data.");
+    }
+
+    return response.data.data;
+  } catch (error) {
+    throw normalizePaymentError(error, "Unable to mark payment as successful.");
+  }
 };
 
 /**
@@ -261,10 +412,68 @@ export const markPaymentFailed = async (
     throw new Error("Payment ID is required.");
   }
 
-  const response = await api.patch<PaymentResponse>(
-    `/payments/${paymentId}/fail`,
-    payload,
-  );
+  try {
+    const response = await api.patch<PaymentResponse>(
+      `/payments/${paymentId}/fail`,
+      payload,
+    );
 
-  return response.data.data;
+    if (!response.data?.data) {
+      throw new Error("Payment failure response did not contain payment data.");
+    }
+
+    return response.data.data;
+  } catch (error) {
+    throw normalizePaymentError(error, "Unable to mark payment as failed.");
+  }
+};
+
+/* -------------------------------------------------------------------------- */
+/*                              ERROR HANDLING                                */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Convert Axios/API errors into useful frontend errors.
+ *
+ * IMPORTANT:
+ *
+ * Authentication errors are intentionally preserved.
+ *
+ * Example:
+ *
+ * Backend:
+ * {
+ *   success: false,
+ *   message: "Access token is missing."
+ * }
+ *
+ * Frontend receives:
+ *
+ * Error("Access token is missing.")
+ *
+ * This makes the real backend problem visible
+ * instead of hiding it behind a generic message.
+ */
+const normalizePaymentError = (
+  error: unknown,
+  fallbackMessage: string,
+): Error => {
+  if (error instanceof Error) {
+    const axiosError = error as typeof error & {
+      response?: {
+        data?: ApiErrorResponse;
+        status?: number;
+      };
+    };
+
+    const serverMessage = axiosError.response?.data?.message;
+
+    if (serverMessage) {
+      return new Error(serverMessage);
+    }
+
+    return error;
+  }
+
+  return new Error(fallbackMessage);
 };

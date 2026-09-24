@@ -7,121 +7,135 @@ interface AuthState {
   accessToken: string | null;
   user: AuthUser | null;
 
+  /*
+   * True after Zustand has restored the persisted
+   * authentication state from localStorage.
+   */
   isHydrated: boolean;
 
   setAuth: (accessToken: string, user: AuthUser) => void;
+
   setAccessToken: (accessToken: string) => void;
+
   setUser: (user: AuthUser) => void;
+
   setHydrated: (value: boolean) => void;
+
   clearAuth: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      /*
-       * ------------------------------------------------------------------------
-       * INITIAL STATE
-       * ------------------------------------------------------------------------
-       */
+      /* ------------------------------------------------------------------ */
+      /* INITIAL STATE                                                     */
+      /* ------------------------------------------------------------------ */
 
       accessToken: null,
+
       user: null,
 
       isHydrated: false,
 
-      /*
-       * ------------------------------------------------------------------------
-       * SET AUTH
-       * ------------------------------------------------------------------------
+      /* ------------------------------------------------------------------ */
+      /* SET AUTH                                                           */
+      /* ------------------------------------------------------------------ */
+
+      /**
+       * Store both:
        *
-       * Used when both access token and user information
-       * are available.
+       * - access token
+       * - authenticated user
        *
-       * Example:
+       * Used after:
        *
        * Normal login
-       * Google login callback
+       * Google OAuth callback
        */
-
-      setAuth: (accessToken, user) =>
+      setAuth: (accessToken, user) => {
         set({
           accessToken,
           user,
-        }),
+        });
+      },
 
-      /*
-       * ------------------------------------------------------------------------
-       * SET ACCESS TOKEN
-       * ------------------------------------------------------------------------
-       *
-       * Used when we receive a new access token from:
+      /* ------------------------------------------------------------------ */
+      /* SET ACCESS TOKEN                                                   */
+      /* ------------------------------------------------------------------ */
+
+      /**
+       * Used when:
        *
        * POST /auth/refresh
        *
-       * This is especially important for the Google OAuth
-       * callback flow.
+       * returns a new access token.
        */
-
-      setAccessToken: (accessToken) =>
+      setAccessToken: (accessToken) => {
         set({
           accessToken,
-        }),
+        });
+      },
 
-      /*
-       * ------------------------------------------------------------------------
-       * SET USER
-       * ------------------------------------------------------------------------
-       */
+      /* ------------------------------------------------------------------ */
+      /* SET USER                                                           */
+      /* ------------------------------------------------------------------ */
 
-      setUser: (user) =>
+      setUser: (user) => {
         set({
           user,
-        }),
+        });
+      },
 
-      /*
-       * ------------------------------------------------------------------------
-       * SET HYDRATED
-       * ------------------------------------------------------------------------
-       *
-       * Zustand persist uses localStorage.
-       *
-       * This tells the application that the persisted
-       * authentication state has been restored.
+      /* ------------------------------------------------------------------ */
+      /* SET HYDRATED                                                       */
+      /* ------------------------------------------------------------------ */
+
+      /**
+       * Zustand persist calls this after localStorage
+       * has been restored.
        */
-
-      setHydrated: (value) =>
+      setHydrated: (value) => {
         set({
           isHydrated: value,
-        }),
+        });
+      },
 
-      /*
-       * ------------------------------------------------------------------------
-       * CLEAR AUTH
-       * ------------------------------------------------------------------------
-       *
-       * Used during logout.
+      /* ------------------------------------------------------------------ */
+      /* CLEAR AUTH                                                         */
+      /* ------------------------------------------------------------------ */
+
+      /**
+       * Used during logout or when refresh authentication
+       * completely fails.
        */
-
-      clearAuth: () =>
+      clearAuth: () => {
         set({
           accessToken: null,
           user: null,
-        }),
+        });
+      },
     }),
-    {
-      /*
-       * Persist authentication state in localStorage.
-       */
 
+    {
       name: "freshfold-auth",
 
       /*
-       * Restore persisted state after application startup.
+       * Only authentication data is persisted.
+       *
+       * isHydrated intentionally remains runtime-only.
        */
+      partialize: (state) => ({
+        accessToken: state.accessToken,
+        user: state.user,
+      }),
 
-      onRehydrateStorage: () => (state) => {
-        state?.setHydrated(true);
+      /*
+       * Called after Zustand restores localStorage.
+       */
+      onRehydrateStorage: () => {
+        return (state) => {
+          state?.setHydrated(true);
+        };
       },
     },
   ),

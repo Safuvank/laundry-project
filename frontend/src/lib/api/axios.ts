@@ -14,8 +14,7 @@ export const api = axios.create({
   },
 
   /*
-   * Required because the refresh token is stored
-   * inside an HttpOnly cookie.
+   * Refresh token is stored in an HttpOnly cookie.
    */
   withCredentials: true,
 });
@@ -23,25 +22,6 @@ export const api = axios.create({
 /* -------------------------------------------------------------------------- */
 /*                         REFRESH TOKEN INSTANCE                             */
 /* -------------------------------------------------------------------------- */
-
-/**
- * Separate Axios instance for refreshing the access token.
- *
- * This prevents:
- *
- * /auth/refresh
- *      ↓
- * 401
- *      ↓
- * interceptor
- *      ↓
- * /auth/refresh
- *      ↓
- * infinite loop
- *
- * The refresh request therefore bypasses the normal
- * `api` response interceptor.
- */
 
 const refreshApi = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
@@ -68,11 +48,6 @@ let failedQueue: Array<{
 /*                            PROCESS QUEUE                                   */
 /* -------------------------------------------------------------------------- */
 
-/**
- * Resolve or reject requests that were waiting
- * while another request was refreshing the token.
- */
-
 const processQueue = (error: unknown, token: string | null): void => {
   failedQueue.forEach((promise) => {
     if (error) {
@@ -97,11 +72,30 @@ api.interceptors.request.use(
     const accessToken = useAuthStore.getState().accessToken;
 
     /*
-     * Attach access token to authenticated requests.
+     * IMPORTANT:
+     *
+     * Every protected API request receives:
+     *
+     * Authorization: Bearer <accessToken>
      */
 
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    /*
+     * Temporary development logging.
+     *
+     * Remove these logs after the authentication
+     * problem is confirmed.
+     */
+    if (process.env.NODE_ENV === "development") {
+      console.log("[API REQUEST]", config.method?.toUpperCase(), config.url);
+
+      console.log(
+        "[API AUTH]",
+        accessToken ? "Access token attached" : "NO ACCESS TOKEN",
+      );
     }
 
     return config;
@@ -129,10 +123,9 @@ api.interceptors.response.use(
       | undefined;
 
     /*
-     * If Axios does not provide the original request,
-     * we cannot safely retry it.
+     * If there is no original request,
+     * we cannot retry safely.
      */
-
     if (!originalRequest) {
       return Promise.reject(error);
     }
@@ -142,19 +135,6 @@ api.interceptors.response.use(
     /* ---------------------------------------------------------------------- */
     /*                         AUTH ENDPOINTS                                 */
     /* ---------------------------------------------------------------------- */
-
-    /*
-     * These endpoints should not automatically trigger
-     * another refresh attempt.
-     *
-     * Especially important for:
-     *
-     * /auth/refresh
-     * /auth/login
-     * /auth/register
-     * /auth/google
-     * /auth/google/callback
-     */
 
     const isAuthRequest =
       requestUrl.includes("/auth/login") ||
@@ -207,16 +187,12 @@ api.interceptors.response.use(
 
     try {
       /*
-       * IMPORTANT:
-       *
-       * Use refreshApi instead of api.
-       *
        * The refresh token is stored in an HttpOnly cookie.
        *
-       * withCredentials: true causes the browser to send
-       * that cookie to the backend.
+       * Therefore refreshApi uses:
+       *
+       * withCredentials: true
        */
-
       const response = await refreshApi.post<{
         success: boolean;
         message: string;
@@ -267,10 +243,6 @@ api.interceptors.response.use(
 
       return Promise.reject(refreshError);
     } finally {
-      /* -------------------------------------------------------------------- */
-      /*                     RELEASE REFRESH LOCK                             */
-      /* -------------------------------------------------------------------- */
-
       isRefreshing = false;
     }
   },
