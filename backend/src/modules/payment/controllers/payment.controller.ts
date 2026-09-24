@@ -11,7 +11,7 @@ class PaymentController {
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Create payment for an order
+   * Create payment for an order.
    *
    * POST /api/v1/payments
    *
@@ -46,11 +46,47 @@ class PaymentController {
   });
 
   /* -------------------------------------------------------------------------- */
+  /*                         CREATE RAZORPAY ORDER                              */
+  /* -------------------------------------------------------------------------- */
+
+  /**
+   * Create a Razorpay order for an existing FreshFold payment.
+   *
+   * POST /api/v1/payments/:id/razorpay-order
+   *
+   * IMPORTANT:
+   * - Amount is NOT accepted from the frontend.
+   * - PaymentService gets the amount from the FreshFold payment.
+   * - FreshFold payment must belong to the authenticated customer.
+   * - Razorpay order ID is stored in gatewayOrderId.
+   */
+  createRazorpayOrder = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.userId;
+
+    const paymentId = req.params.id;
+
+    if (!paymentId || Array.isArray(paymentId)) {
+      throw new ValidationError("Invalid payment id.");
+    }
+
+    const razorpayOrder = await paymentService.createRazorpayOrder(
+      paymentId,
+      userId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Razorpay order created successfully.",
+      data: razorpayOrder,
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
   /*                              GET BY ID                                    */
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Get payment by ID
+   * Get payment by ID.
    *
    * GET /api/v1/payments/:id
    */
@@ -77,7 +113,7 @@ class PaymentController {
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Get payment for an order
+   * Get payment for an order.
    *
    * GET /api/v1/payments/order/:orderId
    */
@@ -104,7 +140,7 @@ class PaymentController {
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Get all payments belonging to logged-in customer
+   * Get all payments belonging to logged-in customer.
    *
    * GET /api/v1/payments/my-payments
    */
@@ -125,9 +161,17 @@ class PaymentController {
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Initiate payment
+   * Initiate payment.
    *
    * PATCH /api/v1/payments/:id/initiate
+   *
+   * NOTE:
+   * This endpoint remains available for the existing/manual
+   * payment flow.
+   *
+   * Razorpay payments should use:
+   *
+   * POST /payments/:id/razorpay-order
    */
   initiatePayment = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user!.userId;
@@ -152,11 +196,18 @@ class PaymentController {
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Mark payment as successful
+   * Mark payment as successful.
    *
-   * Admin / verified payment flow
+   * ADMIN / DEVELOPMENT TESTING
    *
    * PATCH /api/v1/payments/:id/success
+   *
+   * IMPORTANT:
+   * This endpoint is temporary for the existing testing flow.
+   *
+   * The real Razorpay flow uses:
+   *
+   * POST /payments/:id/verify
    */
   markPaymentSuccess = asyncHandler(async (req: Request, res: Response) => {
     const paymentId = req.params.id;
@@ -188,11 +239,16 @@ class PaymentController {
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Mark payment as failed
+   * Mark payment as failed.
    *
    * ADMIN ONLY
    *
    * PATCH /api/v1/payments/:id/fail
+   *
+   * NOTE:
+   * This remains available for development/testing.
+   * Razorpay webhook/payment verification will handle
+   * real gateway payment results later.
    */
   markPaymentFailed = asyncHandler(async (req: Request, res: Response) => {
     const paymentId = req.params.id;
@@ -224,7 +280,7 @@ class PaymentController {
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Refund payment
+   * Refund payment.
    *
    * ADMIN ONLY
    *
@@ -238,7 +294,9 @@ class PaymentController {
    *
    * IMPORTANT:
    * This endpoint is currently for development/testing.
-   * In production, refundId should come from the payment gateway.
+   *
+   * In the production Razorpay flow, the refund ID should
+   * come from Razorpay after the refund is successfully created.
    */
   refundPayment = asyncHandler(async (req: Request, res: Response) => {
     const paymentId = req.params.id;
@@ -266,6 +324,75 @@ class PaymentController {
     return res.status(200).json({
       success: true,
       message: "Payment refunded successfully.",
+      data: payment,
+    });
+  });
+
+  /* -------------------------------------------------------------------------- */
+  /*                         VERIFY RAZORPAY PAYMENT                            */
+  /* -------------------------------------------------------------------------- */
+
+  /**
+   * Verify Razorpay payment.
+   *
+   * POST /api/v1/payments/:id/verify
+   *
+   * Body:
+   * {
+   *   "razorpayPaymentId": "...",
+   *   "razorpayOrderId": "...",
+   *   "razorpaySignature": "..."
+   * }
+   *
+   * IMPORTANT:
+   * The frontend does NOT decide whether the payment succeeded.
+   *
+   * The backend:
+   *
+   * 1. Validates the payment
+   * 2. Checks payment ownership
+   * 3. Checks payment status
+   * 4. Checks Razorpay order ID
+   * 5. Verifies Razorpay signature
+   * 6. Marks payment as SUCCESS
+   * 7. Updates order paymentStatus to PAID
+   */
+  verifyRazorpayPayment = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.userId;
+
+    const paymentId = req.params.id;
+
+    if (!paymentId || Array.isArray(paymentId)) {
+      throw new ValidationError("Invalid payment id.");
+    }
+
+    const { razorpayPaymentId, razorpayOrderId, razorpaySignature } = req.body;
+
+    if (!razorpayPaymentId || typeof razorpayPaymentId !== "string") {
+      throw new ValidationError("Razorpay payment ID is required.");
+    }
+
+    if (!razorpayOrderId || typeof razorpayOrderId !== "string") {
+      throw new ValidationError("Razorpay order ID is required.");
+    }
+
+    if (!razorpaySignature || typeof razorpaySignature !== "string") {
+      throw new ValidationError("Razorpay signature is required.");
+    }
+
+    const payment = await paymentService.verifyRazorpayPayment(
+      paymentId,
+      userId,
+      {
+        razorpayPaymentId,
+        razorpayOrderId,
+        razorpaySignature,
+      },
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Razorpay payment verified successfully.",
       data: payment,
     });
   });

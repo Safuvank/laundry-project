@@ -6,69 +6,46 @@ import { PaymentMethod } from "../constants/paymentMethod.js";
 export interface IPayment {
   _id?: Types.ObjectId;
 
-  /**
-   * Order associated with this payment
-   */
   orderId: Types.ObjectId;
-
-  /**
-   * Customer who made the payment
-   */
   userId: Types.ObjectId;
 
-  /**
-   * Amount to be paid
-   *
-   * This should come from Order.finalPrice.
-   */
   amount: number;
 
-  /**
-   * Current payment status
-   */
   status: PaymentStatus;
 
-  /**
-   * Payment method used by customer
-   *
-   * Example:
-   * RAZORPAY, CARD, UPI, CASH
-   */
-  paymentMethod?: string;
+  paymentMethod?: PaymentMethod;
 
   /**
-   * Gateway transaction/payment ID
+   * Gateway payment/transaction ID
+   *
+   * Example:
+   * Razorpay payment ID
    */
   transactionId?: string;
 
   /**
    * Gateway order ID
+   *
+   * Example:
+   * Razorpay order ID
    */
   gatewayOrderId?: string;
 
   /**
-   * When payment was successfully completed
+   * Gateway payment signature
+   *
+   * Used to verify the payment response.
    */
+  gatewaySignature?: string;
+
   paidAt?: Date;
 
-  /**
-   * Reason when payment fails
-   */
   failureReason?: string;
 
-  /**
-   * Gateway refund transaction/reference ID
-   */
   refundId?: string;
 
-  /**
-   * Reason for refund
-   */
   refundReason?: string;
 
-  /**
-   * When payment was refunded
-   */
   refundedAt?: Date;
 
   createdAt?: Date;

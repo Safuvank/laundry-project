@@ -212,6 +212,65 @@ class PaymentRepository {
   }
 
   /* -------------------------------------------------------------------------- */
+  /*                         SET GATEWAY ORDER ID                              */
+  /* -------------------------------------------------------------------------- */
+
+  /**
+   * Save the gateway/Razorpay order ID.
+   *
+   * This connects the FreshFold payment
+   * with the Razorpay order.
+   */
+  async setGatewayOrderId(
+    paymentId: string | Types.ObjectId,
+    gatewayOrderId: string,
+    session?: ClientSession,
+  ): Promise<IPayment | null> {
+    return Payment.findByIdAndUpdate(
+      paymentId,
+      {
+        $set: {
+          gatewayOrderId,
+        },
+      },
+      {
+        returnDocument: "after",
+        runValidators: true,
+        session: session ?? null,
+      },
+    );
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /*                       SET GATEWAY SIGNATURE                               */
+  /* -------------------------------------------------------------------------- */
+
+  /**
+   * Save the payment gateway signature.
+   *
+   * Used later during Razorpay payment verification.
+   */
+  async setGatewaySignature(
+    paymentId: string | Types.ObjectId,
+    gatewaySignature: string,
+    session?: ClientSession,
+  ): Promise<IPayment | null> {
+    return Payment.findByIdAndUpdate(
+      paymentId,
+      {
+        $set: {
+          gatewaySignature,
+        },
+      },
+      {
+        returnDocument: "after",
+        runValidators: true,
+        session: session ?? null,
+      },
+    );
+  }
+
+  /* -------------------------------------------------------------------------- */
   /*                           UPDATE SUCCESS                                  */
   /* -------------------------------------------------------------------------- */
 
@@ -325,6 +384,8 @@ class PaymentRepository {
         $unset: {
           failureReason: 1,
           transactionId: 1,
+          gatewayOrderId: 1,
+          gatewaySignature: 1,
           paidAt: 1,
           refundId: 1,
           refundReason: 1,

@@ -95,6 +95,12 @@ const paymentSchema = new Schema<IPayment>(
       type: String,
       trim: true,
       index: true,
+      sparse: true,
+      unique: true
+    },
+    gatewaySignature: {
+      type: String,
+      trim: true,
     },
 
     /* ---------------------------------------------------------------------- */

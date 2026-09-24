@@ -14,6 +14,8 @@ import { ValidationError } from "../../../shared/errors/ValidationError.js";
 
 import { NotFoundError } from "../../../shared/errors/NotFoundErrror.js";
 
+import { razorpayService } from "./razorpay.service.js";
+
 export class PaymentService {
   /* -------------------------------------------------------------------------- */
   /*                              PRIVATE HELPERS                               */
@@ -51,6 +53,13 @@ export class PaymentService {
   /*                              CREATE PAYMENT                                */
   /* -------------------------------------------------------------------------- */
 
+  /**
+   * Create a FreshFold payment for an order.
+   *
+   * The payment amount is always taken from the order's finalPrice.
+   *
+   * The frontend must never provide the payment amount.
+   */
   async createPayment(
     data: {
       orderId: string;
@@ -58,14 +67,6 @@ export class PaymentService {
     },
     userId: string,
   ) {
-    console.log("\n======================================");
-    console.log("CREATE PAYMENT");
-    console.log("======================================");
-    console.log("Order ID:", data.orderId);
-    console.log("Authenticated User ID:", userId);
-    console.log("Payment Method:", data.paymentMethod);
-    console.log("======================================");
-
     if (!Types.ObjectId.isValid(data.orderId)) {
       throw new ValidationError("Invalid order id.");
     }
@@ -81,11 +82,6 @@ export class PaymentService {
     }
 
     const orderUserId = this.getObjectIdString(order.userId);
-
-    console.log("CREATE PAYMENT - OWNERSHIP CHECK");
-    console.log("Order User ID:", orderUserId);
-    console.log("Authenticated User ID:", userId);
-    console.log("Ownership Match:", orderUserId === userId);
 
     if (orderUserId !== userId) {
       throw new ValidationError("Order does not belong to this user.");
@@ -105,7 +101,9 @@ export class PaymentService {
       );
     }
 
-    const existingPayment = await paymentRepository.findByOrderId(data.orderId);
+    const existingPayment = await paymentRepository.findByOrderId(
+      data.orderId,
+    );
 
     if (existingPayment) {
       if (existingPayment.status === PaymentStatus.FAILED) {
@@ -116,7 +114,9 @@ export class PaymentService {
         );
       }
 
-      throw new ValidationError("A payment already exists for this order.");
+      throw new ValidationError(
+        "A payment already exists for this order.",
+      );
     }
 
     return paymentRepository.create({
@@ -129,171 +129,34 @@ export class PaymentService {
   }
 
   /* -------------------------------------------------------------------------- */
-  /*                                GET BY ID                                   */
+  /*                         CREATE RAZORPAY ORDER                              */
   /* -------------------------------------------------------------------------- */
 
-  async getById(paymentId: string, userId: string) {
-    console.log("\n======================================");
-    console.log("GET PAYMENT BY ID");
-    console.log("======================================");
-    console.log("Payment ID:", paymentId);
-    console.log("Authenticated User ID:", userId);
-    console.log("======================================");
-
-    if (!Types.ObjectId.isValid(paymentId)) {
-      throw new ValidationError("Invalid payment id.");
-    }
-
-    if (!Types.ObjectId.isValid(userId)) {
-      throw new ValidationError("Invalid user id.");
-    }
-
-    const payment = await paymentRepository.findByIdPopulated(paymentId);
-
-    if (!payment) {
-      console.log("GET PAYMENT BY ID - Payment not found.");
-
-      throw new NotFoundError("Payment not found.");
-    }
-
-    const paymentUserId = this.getObjectIdString(payment.userId);
-
-    console.log("\n---------- PAYMENT OWNERSHIP DEBUG ----------");
-    console.log("Payment ID:", payment._id?.toString());
-    console.log("Payment User ID:", paymentUserId);
-    console.log("Authenticated User ID:", userId);
-    console.log("Ownership Match:", paymentUserId === userId);
-    console.log("----------------------------------------------");
-
-    if (paymentUserId !== userId) {
-      console.log("GET PAYMENT BY ID - OWNERSHIP FAILED");
-
-      throw new ValidationError("Payment does not belong to this user.");
-    }
-
-    console.log("GET PAYMENT BY ID - OWNERSHIP VERIFIED");
-
-    return payment;
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /*                           GET BY ORDER ID                                  */
-  /* -------------------------------------------------------------------------- */
-
-  async getByOrderId(orderId: string, userId: string) {
-    console.log("\n======================================");
-    console.log("GET PAYMENT BY ORDER ID");
-    console.log("======================================");
-    console.log("Order ID:", orderId);
-    console.log("Authenticated User ID:", userId);
-    console.log("======================================");
-
-    if (!Types.ObjectId.isValid(orderId)) {
-      console.log("Invalid order ID:", orderId);
-
-      throw new ValidationError("Invalid order id.");
-    }
-
-    if (!Types.ObjectId.isValid(userId)) {
-      console.log("Invalid authenticated user ID:", userId);
-
-      throw new ValidationError("Invalid user id.");
-    }
-
-    console.log("Searching payment for order:", orderId);
-
-    const payment = await paymentRepository.findByOrderIdPopulated(orderId);
-
-    if (!payment) {
-      console.log("\n---------- PAYMENT DEBUG ----------");
-      console.log("Payment NOT FOUND for order.");
-      console.log("Order ID:", orderId);
-      console.log("Authenticated User ID:", userId);
-      console.log("-----------------------------------");
-
-      throw new NotFoundError("Payment not found for this order.");
-    }
-
-    /*
-     * IMPORTANT:
-     *
-     * findByOrderIdPopulated() populates:
-     *
-     * payment.orderId
-     * payment.userId
-     *
-     * Therefore we must extract their _id values instead of calling
-     * .toString() directly on the populated objects.
-     */
-
-    const paymentUserId = this.getObjectIdString(payment.userId);
-    const paymentOrderId = this.getObjectIdString(payment.orderId);
-
-    console.log("\n======================================");
-    console.log("PAYMENT OWNERSHIP DEBUG");
-    console.log("======================================");
-    console.log("Payment ID:", payment._id?.toString());
-    console.log("Payment Order ID:", paymentOrderId);
-    console.log("Payment User ID:", paymentUserId);
-    console.log("Authenticated User ID:", userId);
-    console.log("Ownership Match:", paymentUserId === userId);
-    console.log("Payment Status:", payment.status);
-    console.log("Payment Amount:", payment.amount);
-    console.log("======================================");
-
-    if (paymentUserId !== userId) {
-      console.log("\n======================================");
-      console.log("PAYMENT OWNERSHIP FAILED");
-      console.log("======================================");
-      console.log("Payment belongs to:", paymentUserId);
-      console.log("Request made by:", userId);
-      console.log("Order ID:", orderId);
-      console.log("======================================\n");
-
-      throw new ValidationError("Payment does not belong to this user.");
-    }
-
-    console.log("\n======================================");
-    console.log("PAYMENT OWNERSHIP VERIFIED");
-    console.log("======================================");
-    console.log("Payment ID:", payment._id?.toString());
-    console.log("Payment User ID:", paymentUserId);
-    console.log("Authenticated User ID:", userId);
-    console.log("======================================\n");
-
-    return payment;
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /*                           GET MY PAYMENTS                                 */
-  /* -------------------------------------------------------------------------- */
-
-  async getMyPayments(userId: string) {
-    console.log("\n======================================");
-    console.log("GET MY PAYMENTS");
-    console.log("======================================");
-    console.log("Authenticated User ID:", userId);
-    console.log("======================================");
-
-    if (!Types.ObjectId.isValid(userId)) {
-      throw new ValidationError("Invalid user id.");
-    }
-
-    return paymentRepository.findByUserIdPopulated(userId);
-  }
-
-  /* -------------------------------------------------------------------------- */
-  /*                           INITIATE PAYMENT                                */
-  /* -------------------------------------------------------------------------- */
-
-  async initiatePayment(paymentId: string, userId: string) {
-    console.log("\n======================================");
-    console.log("INITIATE PAYMENT");
-    console.log("======================================");
-    console.log("Payment ID:", paymentId);
-    console.log("Authenticated User ID:", userId);
-    console.log("======================================");
-
+  /**
+   * Create a Razorpay order for an existing FreshFold payment.
+   *
+   * Flow:
+   *
+   * FreshFold Payment
+   *        ↓
+   * Validate ownership
+   *        ↓
+   * Validate payment status
+   *        ↓
+   * Get amount from FreshFold Payment
+   *        ↓
+   * Convert INR → paise
+   *        ↓
+   * Create Razorpay Order
+   *        ↓
+   * Save gatewayOrderId
+   *        ↓
+   * Payment PENDING → INITIATED
+   */
+  async createRazorpayOrder(
+    paymentId: string,
+    userId: string,
+  ) {
     if (!Types.ObjectId.isValid(paymentId)) {
       throw new ValidationError("Invalid payment id.");
     }
@@ -308,27 +171,284 @@ export class PaymentService {
       throw new NotFoundError("Payment not found.");
     }
 
+    /* ---------------------------- OWNERSHIP CHECK --------------------------- */
+
     const paymentUserId = this.getObjectIdString(payment.userId);
 
-    console.log("\n---------- INITIATE OWNERSHIP DEBUG ----------");
-    console.log("Payment ID:", payment._id?.toString());
-    console.log("Payment User ID:", paymentUserId);
-    console.log("Authenticated User ID:", userId);
-    console.log("Ownership Match:", paymentUserId === userId);
-    console.log("----------------------------------------------");
-
     if (paymentUserId !== userId) {
-      console.log("INITIATE PAYMENT - OWNERSHIP FAILED");
-
-      throw new ValidationError("Payment does not belong to this user.");
+      throw new ValidationError(
+        "Payment does not belong to this user.",
+      );
     }
 
+    /* ---------------------------- STATUS CHECK ----------------------------- */
+
     if (payment.status === PaymentStatus.SUCCESS) {
-      throw new ValidationError("Payment has already been completed.");
+      throw new ValidationError(
+        "Payment has already been completed.",
+      );
     }
 
     if (payment.status === PaymentStatus.REFUNDED) {
-      throw new ValidationError("Refunded payment cannot be initiated.");
+      throw new ValidationError(
+        "Refunded payment cannot be initiated.",
+      );
+    }
+
+    if (payment.status === PaymentStatus.FAILED) {
+      throw new ValidationError(
+        "Failed payment must be retried before creating a Razorpay order.",
+      );
+    }
+
+    if (
+      payment.status !== PaymentStatus.PENDING &&
+      payment.status !== PaymentStatus.INITIATED
+    ) {
+      throw new ValidationError(
+        `Payment cannot be initiated from ${payment.status} status.`,
+      );
+    }
+
+    /* ---------------------------- AMOUNT CHECK ----------------------------- */
+
+    if (!Number.isFinite(payment.amount) || payment.amount <= 0) {
+      throw new ValidationError(
+        "Payment amount must be greater than zero.",
+      );
+    }
+
+    /* ----------------------- EXISTING RAZORPAY ORDER ----------------------- */
+
+    /**
+     * If a Razorpay order was already created for this payment,
+     * return the existing order instead of creating another one.
+     *
+     * This protects against duplicate requests from the frontend.
+     */
+    if (
+      payment.status === PaymentStatus.INITIATED &&
+      payment.gatewayOrderId
+    ) {
+      return {
+        paymentId: payment._id!.toString(),
+        gatewayOrderId: payment.gatewayOrderId,
+        amount: payment.amount,
+        amountInPaise: Math.round(payment.amount * 100),
+        currency: "INR",
+        status: "created",
+      };
+    }
+
+    /* -------------------------- CREATE RAZORPAY ---------------------------- */
+
+    const razorpayOrder = await razorpayService.createOrder({
+      amount: payment.amount,
+      currency: "INR",
+      receipt: `freshfold_${payment._id!.toString()}`,
+    });
+
+    if (!razorpayOrder?.id) {
+      throw new ValidationError(
+        "Razorpay order could not be created.",
+      );
+    }
+
+    /* ------------------------ SAVE GATEWAY ORDER ID ------------------------ */
+
+    const updatedPayment = await paymentRepository.setGatewayOrderId(
+      payment._id!,
+      razorpayOrder.id,
+    );
+
+    if (!updatedPayment) {
+      throw new NotFoundError(
+        "Payment could not be updated with Razorpay order.",
+      );
+    }
+
+    /* ------------------------ UPDATE PAYMENT STATUS ----------------------- */
+
+    /**
+     * Razorpay order has successfully been created.
+     *
+     * Therefore FreshFold payment moves:
+     *
+     * PENDING → INITIATED
+     */
+    if (payment.status === PaymentStatus.PENDING) {
+      const initiatedPayment = await paymentRepository.updateStatus(
+        payment._id!,
+        PaymentStatus.INITIATED,
+      );
+
+      if (!initiatedPayment) {
+        throw new NotFoundError(
+          "Payment status could not be updated.",
+        );
+      }
+    }
+
+    /* ------------------------------ RESPONSE ------------------------------- */
+
+    return {
+      paymentId: payment._id!.toString(),
+      gatewayOrderId: razorpayOrder.id,
+      amount: payment.amount,
+      amountInPaise: razorpayOrder.amount,
+      currency: razorpayOrder.currency,
+      status: razorpayOrder.status,
+    };
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /*                                GET BY ID                                   */
+  /* -------------------------------------------------------------------------- */
+
+  async getById(
+    paymentId: string,
+    userId: string,
+  ) {
+    if (!Types.ObjectId.isValid(paymentId)) {
+      throw new ValidationError("Invalid payment id.");
+    }
+
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new ValidationError("Invalid user id.");
+    }
+
+    const payment = await paymentRepository.findByIdPopulated(
+      paymentId,
+    );
+
+    if (!payment) {
+      throw new NotFoundError("Payment not found.");
+    }
+
+    const paymentUserId = this.getObjectIdString(
+      payment.userId,
+    );
+
+    if (paymentUserId !== userId) {
+      throw new ValidationError(
+        "Payment does not belong to this user.",
+      );
+    }
+
+    return payment;
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /*                           GET BY ORDER ID                                  */
+  /* -------------------------------------------------------------------------- */
+
+  async getByOrderId(
+    orderId: string,
+    userId: string,
+  ) {
+    if (!Types.ObjectId.isValid(orderId)) {
+      throw new ValidationError("Invalid order id.");
+    }
+
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new ValidationError("Invalid user id.");
+    }
+
+    const payment = await paymentRepository.findByOrderIdPopulated(
+      orderId,
+    );
+
+    if (!payment) {
+      throw new NotFoundError(
+        "Payment not found for this order.",
+      );
+    }
+
+    const paymentUserId = this.getObjectIdString(
+      payment.userId,
+    );
+
+    const paymentOrderId = this.getObjectIdString(
+      payment.orderId,
+    );
+
+    if (paymentUserId !== userId) {
+      throw new ValidationError(
+        "Payment does not belong to this user.",
+      );
+    }
+
+    if (paymentOrderId !== orderId) {
+      throw new ValidationError(
+        "Payment does not belong to this order.",
+      );
+    }
+
+    return payment;
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /*                           GET MY PAYMENTS                                 */
+  /* -------------------------------------------------------------------------- */
+
+  async getMyPayments(userId: string) {
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new ValidationError("Invalid user id.");
+    }
+
+    return paymentRepository.findByUserIdPopulated(userId);
+  }
+
+  /* -------------------------------------------------------------------------- */
+  /*                           INITIATE PAYMENT                                */
+  /* -------------------------------------------------------------------------- */
+
+  /**
+   * Legacy/manual payment initiation.
+   *
+   * Razorpay flow should use createRazorpayOrder()
+   * instead of this endpoint.
+   */
+  async initiatePayment(
+    paymentId: string,
+    userId: string,
+  ) {
+    if (!Types.ObjectId.isValid(paymentId)) {
+      throw new ValidationError("Invalid payment id.");
+    }
+
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new ValidationError("Invalid user id.");
+    }
+
+    const payment = await paymentRepository.findById(
+      paymentId,
+    );
+
+    if (!payment) {
+      throw new NotFoundError("Payment not found.");
+    }
+
+    const paymentUserId = this.getObjectIdString(
+      payment.userId,
+    );
+
+    if (paymentUserId !== userId) {
+      throw new ValidationError(
+        "Payment does not belong to this user.",
+      );
+    }
+
+    if (payment.status === PaymentStatus.SUCCESS) {
+      throw new ValidationError(
+        "Payment has already been completed.",
+      );
+    }
+
+    if (payment.status === PaymentStatus.REFUNDED) {
+      throw new ValidationError(
+        "Refunded payment cannot be initiated.",
+      );
     }
 
     if (payment.status === PaymentStatus.FAILED) {
@@ -356,10 +476,235 @@ export class PaymentService {
   }
 
   /* -------------------------------------------------------------------------- */
+  /*                         VERIFY RAZORPAY PAYMENT                            */
+  /* -------------------------------------------------------------------------- */
+
+  /**
+   * Verify a Razorpay payment.
+   *
+   * Flow:
+   *
+   * Razorpay Checkout
+   *        ↓
+   * razorpay_payment_id
+   * razorpay_order_id
+   * razorpay_signature
+   *        ↓
+   * Validate FreshFold payment
+   *        ↓
+   * Validate Razorpay order ID
+   *        ↓
+   * Verify Razorpay signature
+   *        ↓
+   * Payment → SUCCESS
+   *        ↓
+   * Order.paymentStatus → PAID
+   */
+  async verifyRazorpayPayment(
+    paymentId: string,
+    userId: string,
+    data: {
+      razorpayPaymentId: string;
+      razorpayOrderId: string;
+      razorpaySignature: string;
+    },
+  ) {
+    if (!Types.ObjectId.isValid(paymentId)) {
+      throw new ValidationError("Invalid payment id.");
+    }
+
+    if (!Types.ObjectId.isValid(userId)) {
+      throw new ValidationError("Invalid user id.");
+    }
+
+    if (
+      !data.razorpayPaymentId ||
+      !data.razorpayOrderId ||
+      !data.razorpaySignature
+    ) {
+      throw new ValidationError(
+        "Razorpay payment verification details are required.",
+      );
+    }
+
+    const payment = await paymentRepository.findById(
+      paymentId,
+    );
+
+    if (!payment) {
+      throw new NotFoundError("Payment not found.");
+    }
+
+    /* ---------------------------- OWNERSHIP -------------------------------- */
+
+    const paymentUserId = this.getObjectIdString(
+      payment.userId,
+    );
+
+    if (paymentUserId !== userId) {
+      throw new ValidationError(
+        "Payment does not belong to this user.",
+      );
+    }
+
+    /* ---------------------------- STATUS ----------------------------------- */
+
+    if (payment.status === PaymentStatus.SUCCESS) {
+      throw new ValidationError(
+        "Payment has already been completed.",
+      );
+    }
+
+    if (payment.status === PaymentStatus.REFUNDED) {
+      throw new ValidationError(
+        "Refunded payment cannot be completed.",
+      );
+    }
+
+    if (payment.status !== PaymentStatus.INITIATED) {
+      throw new ValidationError(
+        "Only initiated payments can be verified.",
+      );
+    }
+
+    /* ------------------------ RAZORPAY ORDER ID ---------------------------- */
+
+    if (!payment.gatewayOrderId) {
+      throw new ValidationError(
+        "Razorpay order ID is missing.",
+      );
+    }
+
+    if (
+      payment.gatewayOrderId !==
+      data.razorpayOrderId
+    ) {
+      throw new ValidationError(
+        "Razorpay order ID does not match the payment.",
+      );
+    }
+
+    /* -------------------------- SIGNATURE ---------------------------------- */
+
+    const isSignatureValid =
+      razorpayService.verifyPayment({
+        razorpayOrderId: data.razorpayOrderId,
+        razorpayPaymentId: data.razorpayPaymentId,
+        razorpaySignature: data.razorpaySignature,
+      });
+
+    if (!isSignatureValid) {
+      throw new ValidationError(
+        "Invalid Razorpay payment signature.",
+      );
+    }
+
+    /* -------------------------- DATABASE TRANSACTION ----------------------- */
+
+    const session = await mongoose.startSession();
+
+    try {
+      let updatedPayment;
+
+      await session.withTransaction(async () => {
+        const currentPayment =
+          await paymentRepository.findById(
+            paymentId,
+            session,
+          );
+
+        if (!currentPayment) {
+          throw new NotFoundError("Payment not found.");
+        }
+
+        if (currentPayment.status === PaymentStatus.SUCCESS) {
+          throw new ValidationError(
+            "Payment has already been completed.",
+          );
+        }
+
+        if (
+          currentPayment.status !== PaymentStatus.INITIATED
+        ) {
+          throw new ValidationError(
+            "Payment is no longer available for verification.",
+          );
+        }
+
+        if (
+          currentPayment.gatewayOrderId !==
+          data.razorpayOrderId
+        ) {
+          throw new ValidationError(
+            "Razorpay order ID does not match the payment.",
+          );
+        }
+
+        const order = await orderRepository.findById(
+          currentPayment.orderId,
+          session,
+        );
+
+        if (!order) {
+          throw new NotFoundError("Order not found.");
+        }
+
+        updatedPayment =
+          await paymentRepository.markAsSuccess(
+            paymentId,
+            data.razorpayPaymentId,
+            session,
+          );
+
+        if (!updatedPayment) {
+          throw new NotFoundError(
+            "Payment could not be completed.",
+          );
+        }
+
+        const updatedPaymentWithSignature =
+          await paymentRepository.setGatewaySignature(
+            paymentId,
+            data.razorpaySignature,
+            session,
+          );
+
+        if (!updatedPaymentWithSignature) {
+          throw new NotFoundError(
+            "Payment signature could not be saved.",
+          );
+        }
+
+        const updatedOrder =
+          await orderRepository.updatePaymentStatus(
+            currentPayment.orderId,
+            OrderPaymentStatus.PAID,
+            session,
+          );
+
+        if (!updatedOrder) {
+          throw new NotFoundError(
+            "Order payment status could not be updated.",
+          );
+        }
+      });
+
+      return updatedPayment;
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  /* -------------------------------------------------------------------------- */
   /*                           PAYMENT SUCCESS                                 */
   /* -------------------------------------------------------------------------- */
 
   /**
+   * Development/testing success method.
+   *
+   * Production Razorpay payments should use
+   * verifyRazorpayPayment().
+   *
    * Payment:
    *
    * INITIATED → SUCCESS
@@ -368,20 +713,18 @@ export class PaymentService {
    *
    * paymentStatus → PAID
    */
-  async markPaymentSuccess(paymentId: string, transactionId: string) {
-    console.log("\n======================================");
-    console.log("MARK PAYMENT SUCCESS");
-    console.log("======================================");
-    console.log("Payment ID:", paymentId);
-    console.log("Transaction ID:", transactionId);
-    console.log("======================================");
-
+  async markPaymentSuccess(
+    paymentId: string,
+    transactionId: string,
+  ) {
     if (!Types.ObjectId.isValid(paymentId)) {
       throw new ValidationError("Invalid payment id.");
     }
 
     if (!transactionId || !transactionId.trim()) {
-      throw new ValidationError("Transaction id is required.");
+      throw new ValidationError(
+        "Transaction id is required.",
+      );
     }
 
     const session = await mongoose.startSession();
@@ -390,18 +733,25 @@ export class PaymentService {
       let updatedPayment;
 
       await session.withTransaction(async () => {
-        const payment = await paymentRepository.findById(paymentId, session);
+        const payment = await paymentRepository.findById(
+          paymentId,
+          session,
+        );
 
         if (!payment) {
           throw new NotFoundError("Payment not found.");
         }
 
         if (payment.status === PaymentStatus.SUCCESS) {
-          throw new ValidationError("Payment has already been completed.");
+          throw new ValidationError(
+            "Payment has already been completed.",
+          );
         }
 
         if (payment.status === PaymentStatus.REFUNDED) {
-          throw new ValidationError("Refunded payment cannot be completed.");
+          throw new ValidationError(
+            "Refunded payment cannot be completed.",
+          );
         }
 
         if (payment.status !== PaymentStatus.INITIATED) {
@@ -410,30 +760,39 @@ export class PaymentService {
           );
         }
 
-        const order = await orderRepository.findById(payment.orderId, session);
+        const order = await orderRepository.findById(
+          payment.orderId,
+          session,
+        );
 
         if (!order) {
           throw new NotFoundError("Order not found.");
         }
 
-        updatedPayment = await paymentRepository.markAsSuccess(
-          paymentId,
-          transactionId.trim(),
-          session,
-        );
+        updatedPayment =
+          await paymentRepository.markAsSuccess(
+            paymentId,
+            transactionId.trim(),
+            session,
+          );
 
         if (!updatedPayment) {
-          throw new NotFoundError("Payment could not be completed.");
+          throw new NotFoundError(
+            "Payment could not be completed.",
+          );
         }
 
-        const updatedOrder = await orderRepository.updatePaymentStatus(
-          payment.orderId,
-          OrderPaymentStatus.PAID,
-          session,
-        );
+        const updatedOrder =
+          await orderRepository.updatePaymentStatus(
+            payment.orderId,
+            OrderPaymentStatus.PAID,
+            session,
+          );
 
         if (!updatedOrder) {
-          throw new NotFoundError("Order payment status could not be updated.");
+          throw new NotFoundError(
+            "Order payment status could not be updated.",
+          );
         }
       });
 
@@ -447,19 +806,18 @@ export class PaymentService {
   /*                            PAYMENT FAILED                                 */
   /* -------------------------------------------------------------------------- */
 
-  async markPaymentFailed(paymentId: string, failureReason: string) {
-    console.log("\n======================================");
-    console.log("MARK PAYMENT FAILED");
-    console.log("======================================");
-    console.log("Payment ID:", paymentId);
-    console.log("======================================");
-
+  async markPaymentFailed(
+    paymentId: string,
+    failureReason: string,
+  ) {
     if (!Types.ObjectId.isValid(paymentId)) {
       throw new ValidationError("Invalid payment id.");
     }
 
     if (!failureReason || !failureReason.trim()) {
-      throw new ValidationError("Failure reason is required.");
+      throw new ValidationError(
+        "Failure reason is required.",
+      );
     }
 
     const session = await mongoose.startSession();
@@ -468,7 +826,10 @@ export class PaymentService {
       let updatedPayment;
 
       await session.withTransaction(async () => {
-        const payment = await paymentRepository.findById(paymentId, session);
+        const payment = await paymentRepository.findById(
+          paymentId,
+          session,
+        );
 
         if (!payment) {
           throw new NotFoundError("Payment not found.");
@@ -492,30 +853,39 @@ export class PaymentService {
           );
         }
 
-        const order = await orderRepository.findById(payment.orderId, session);
+        const order = await orderRepository.findById(
+          payment.orderId,
+          session,
+        );
 
         if (!order) {
           throw new NotFoundError("Order not found.");
         }
 
-        updatedPayment = await paymentRepository.markAsFailed(
-          paymentId,
-          failureReason.trim(),
-          session,
-        );
+        updatedPayment =
+          await paymentRepository.markAsFailed(
+            paymentId,
+            failureReason.trim(),
+            session,
+          );
 
         if (!updatedPayment) {
-          throw new NotFoundError("Payment could not be marked as failed.");
+          throw new NotFoundError(
+            "Payment could not be marked as failed.",
+          );
         }
 
-        const updatedOrder = await orderRepository.updatePaymentStatus(
-          payment.orderId,
-          OrderPaymentStatus.FAILED,
-          session,
-        );
+        const updatedOrder =
+          await orderRepository.updatePaymentStatus(
+            payment.orderId,
+            OrderPaymentStatus.FAILED,
+            session,
+          );
 
         if (!updatedOrder) {
-          throw new NotFoundError("Order payment status could not be updated.");
+          throw new NotFoundError(
+            "Order payment status could not be updated.",
+          );
         }
       });
 
@@ -534,23 +904,20 @@ export class PaymentService {
     refundId: string,
     refundReason: string,
   ) {
-    console.log("\n======================================");
-    console.log("REFUND PAYMENT");
-    console.log("======================================");
-    console.log("Payment ID:", paymentId);
-    console.log("Refund ID:", refundId);
-    console.log("======================================");
-
     if (!Types.ObjectId.isValid(paymentId)) {
       throw new ValidationError("Invalid payment id.");
     }
 
     if (!refundId || !refundId.trim()) {
-      throw new ValidationError("Refund id is required.");
+      throw new ValidationError(
+        "Refund id is required.",
+      );
     }
 
     if (!refundReason || !refundReason.trim()) {
-      throw new ValidationError("Refund reason is required.");
+      throw new ValidationError(
+        "Refund reason is required.",
+      );
     }
 
     const session = await mongoose.startSession();
@@ -559,14 +926,19 @@ export class PaymentService {
       let updatedPayment;
 
       await session.withTransaction(async () => {
-        const payment = await paymentRepository.findById(paymentId, session);
+        const payment = await paymentRepository.findById(
+          paymentId,
+          session,
+        );
 
         if (!payment) {
           throw new NotFoundError("Payment not found.");
         }
 
         if (payment.status === PaymentStatus.REFUNDED) {
-          throw new ValidationError("Payment has already been refunded.");
+          throw new ValidationError(
+            "Payment has already been refunded.",
+          );
         }
 
         if (payment.status !== PaymentStatus.SUCCESS) {
@@ -575,31 +947,40 @@ export class PaymentService {
           );
         }
 
-        const order = await orderRepository.findById(payment.orderId, session);
+        const order = await orderRepository.findById(
+          payment.orderId,
+          session,
+        );
 
         if (!order) {
           throw new NotFoundError("Order not found.");
         }
 
-        updatedPayment = await paymentRepository.markAsRefunded(
-          paymentId,
-          refundId.trim(),
-          refundReason.trim(),
-          session,
-        );
+        updatedPayment =
+          await paymentRepository.markAsRefunded(
+            paymentId,
+            refundId.trim(),
+            refundReason.trim(),
+            session,
+          );
 
         if (!updatedPayment) {
-          throw new NotFoundError("Payment could not be refunded.");
+          throw new NotFoundError(
+            "Payment could not be refunded.",
+          );
         }
 
-        const updatedOrder = await orderRepository.updatePaymentStatus(
-          payment.orderId,
-          OrderPaymentStatus.REFUNDED,
-          session,
-        );
+        const updatedOrder =
+          await orderRepository.updatePaymentStatus(
+            payment.orderId,
+            OrderPaymentStatus.REFUNDED,
+            session,
+          );
 
         if (!updatedOrder) {
-          throw new NotFoundError("Order payment status could not be updated.");
+          throw new NotFoundError(
+            "Order payment status could not be updated.",
+          );
         }
       });
 
