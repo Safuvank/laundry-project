@@ -67,7 +67,9 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
       <main className="min-h-screen bg-slate-50">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
-            <p className="text-sm font-medium text-red-600">Order Details</p>
+            <p className="text-sm font-medium text-red-600">
+              Order Details
+            </p>
 
             <h1 className="mt-1 text-2xl font-bold text-red-900">
               Unable to load this order
@@ -180,7 +182,9 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
         <header className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-blue-600">Order Details</p>
+              <p className="text-sm font-medium text-blue-600">
+                Order Details
+              </p>
 
               <h1 className="mt-1 break-all text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                 #{order._id}
@@ -232,7 +236,10 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
                   value={new Date(order.pickupDate).toLocaleDateString()}
                 />
 
-                <InfoItem label="Pickup Time" value={order.pickupTimeSlot} />
+                <InfoItem
+                  label="Pickup Time"
+                  value={order.pickupTimeSlot}
+                />
 
                 <InfoItem
                   label="Detergent"
@@ -295,7 +302,9 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
 
                 <InfoItem
                   label="Pricing Status"
-                  value={order.pricingStatus.replaceAll("_", " ").toLowerCase()}
+                  value={order.pricingStatus
+                    .replaceAll("_", " ")
+                    .toLowerCase()}
                 />
               </div>
 
@@ -353,7 +362,9 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
               <div className="mt-6">
                 <InfoItem
                   label="Order Payment Status"
-                  value={order.paymentStatus.replaceAll("_", " ").toLowerCase()}
+                  value={order.paymentStatus
+                    .replaceAll("_", " ")
+                    .toLowerCase()}
                 />
               </div>
             </section>
@@ -374,14 +385,18 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
                     <PaymentMethodSelector
                       value={payment.paymentMethod || paymentMethod}
                       onChange={setPaymentMethod}
-                      disabled={isPaymentCreating || isPaymentInitiating}
+                      disabled={
+                        isPaymentCreating || isPaymentInitiating
+                      }
                     />
 
                     <PaymentButton
                       amount={payment.amount}
-                      paymentMethod={payment.paymentMethod || paymentMethod}
+                      paymentMethod={
+                        payment.paymentMethod || paymentMethod
+                      }
                       isCreating={isPaymentCreating}
-                      isInitiating={isPaymentInitiating}
+                      isProcessing={isPaymentInitiating}
                       onPay={handlePay}
                     />
                   </>
@@ -393,14 +408,18 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
                     <PaymentMethodSelector
                       value={paymentMethod}
                       onChange={setPaymentMethod}
-                      disabled={isPaymentCreating || isPaymentInitiating}
+                      disabled={
+                        isPaymentCreating || isPaymentInitiating
+                      }
                     />
 
                     <PaymentButton
                       amount={payment.amount}
-                      paymentMethod={paymentMethod}
+                      paymentMethod={
+                        payment.paymentMethod || paymentMethod
+                      }
                       isCreating={isPaymentCreating}
-                      isInitiating={isPaymentInitiating}
+                      isProcessing={isPaymentInitiating}
                       onPay={handlePay}
                     />
                   </>
@@ -414,14 +433,16 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
                 <PaymentMethodSelector
                   value={paymentMethod}
                   onChange={setPaymentMethod}
-                  disabled={isPaymentCreating || isPaymentInitiating}
+                  disabled={
+                    isPaymentCreating || isPaymentInitiating
+                  }
                 />
 
                 <PaymentButton
                   amount={finalPrice}
                   paymentMethod={paymentMethod}
                   isCreating={isPaymentCreating}
-                  isInitiating={isPaymentInitiating}
+                  isProcessing={isPaymentInitiating}
                   onPay={handlePay}
                 />
               </div>
@@ -468,7 +489,13 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
   );
 }
 
-function InfoItem({ label, value }: { label: string; value: string }) {
+function InfoItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
   return (
     <div>
       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
