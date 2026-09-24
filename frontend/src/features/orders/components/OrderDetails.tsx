@@ -16,6 +16,7 @@ import PaymentSummary from "@/features/payments/components/PaymentSummary";
 import PaymentMethodSelector from "@/features/payments/components/PaymentMethodSelector";
 import PaymentButton from "@/features/payments/components/PaymentButton";
 import PaymentStatus from "@/features/payments/components/PaymentStatus";
+import RazorpayCheckout from "@/features/payments/components/RazorpayCheckout";
 
 import type { PaymentMethod } from "@/features/payments/types/payment.type";
 
@@ -44,6 +45,32 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("UPI");
 
+  /*
+   * Stores the payment ID that should be sent to Razorpay.
+   *
+   * Example:
+   *
+   * MongoDB Payment ID
+   * 6ab5673059e01bbd57cacc1e
+   */
+  const [activePaymentId, setActivePaymentId] = useState<string | null>(null);
+
+  /*
+   * Controls whether RazorpayCheckout is mounted.
+   *
+   * Once true, RazorpayCheckout automatically:
+   *
+   * 1. Loads Razorpay
+   * 2. Creates Razorpay order
+   * 3. Opens Razorpay Checkout
+   */
+  const [showRazorpay, setShowRazorpay] = useState(false);
+
+  /*
+   * Payment error displayed inside the payment section.
+   */
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
   if (isLoading) {
     return (
       <main className="min-h-screen bg-slate-50">
@@ -67,9 +94,7 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
       <main className="min-h-screen bg-slate-50">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
-            <p className="text-sm font-medium text-red-600">
-              Order Details
-            </p>
+            <p className="text-sm font-medium text-red-600">Order Details</p>
 
             <h1 className="mt-1 text-2xl font-bold text-red-900">
               Unable to load this order
@@ -113,8 +138,8 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
    *
    * 1. Final price exists
    * 2. Final price is greater than zero
-   * 3. Customer has already approved the price
-   * 4. Payment has not already been completed/refunded
+   * 3. Customer has approved the price
+   * 4. Order has not already been paid/refunded
    */
   const canPay =
     order.finalPrice !== undefined &&
@@ -127,31 +152,154 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
   const finalPrice = order.finalPrice ?? 0;
 
   const isPaymentCreating = createPaymentMutation.isPending;
+
   const isPaymentInitiating = initiatePaymentMutation.isPending;
 
+  /*
+   * ---------------------------------------------------------------
+   * START RAZORPAY
+   * ---------------------------------------------------------------
+   *
+   * This function mounts RazorpayCheckout.
+   *
+   * RazorpayCheckout then:
+   *
+   * createRazorpayOrder()
+   *        ↓
+   * Razorpay.open()
+   *        ↓
+   * Customer payment
+   *        ↓
+   * verifyRazorpayPayment()
+   */
+  const startRazorpayCheckout = (paymentId: string) => {
+    setPaymentError(null);
+
+    setActivePaymentId(paymentId);
+
+    setShowRazorpay(true);
+  };
+
+  /*
+   * ---------------------------------------------------------------
+   * PAY BUTTON
+   * ---------------------------------------------------------------
+   *
+   * Flow:
+   *
+   * Existing PENDING payment:
+   *     initiate payment
+   *          ↓
+   *     open Razorpay
+   *
+   * No payment:
+   *     create payment
+   *          ↓
+   *     initiate payment
+   *          ↓
+   *     open Razorpay
+   *
+   * Failed payment:
+   *     create/reset payment
+   *          ↓
+   *     initiate payment
+   *          ↓
+   *     open Razorpay
+   */
   const handlePay = () => {
     if (!canPay || !order.finalPrice) {
       return;
     }
 
+    setPaymentError(null);
+
     /*
-     * If a payment already exists, don't create another one.
-     * Instead initiate the existing pending payment.
+     * -------------------------------------------------------------
+     * EXISTING PAYMENT
+     * -------------------------------------------------------------
      */
+
     if (payment) {
+      /*
+       * Pending payment
+       */
       if (payment.status === "PENDING") {
-        initiatePaymentMutation.mutate(payment._id);
+        initiatePaymentMutation.mutate(payment._id, {
+          onSuccess: () => {
+            startRazorpayCheckout(payment._id);
+          },
+
+          onError: (error) => {
+            const message =
+              error instanceof Error
+                ? error.message
+                : "Unable to initiate payment.";
+
+            setPaymentError(message);
+          },
+        });
+
+        return;
       }
 
+      /*
+       * Failed payment
+       *
+       * We create the payment again so the backend can
+       * reset/reuse the failed payment according to the
+       * payment service logic.
+       */
+      if (payment.status === "FAILED") {
+        createPaymentMutation.mutate(
+          {
+            orderId: order._id,
+            paymentMethod,
+          },
+          {
+            onSuccess: (createdPayment) => {
+              initiatePaymentMutation.mutate(createdPayment._id, {
+                onSuccess: () => {
+                  startRazorpayCheckout(createdPayment._id);
+                },
+
+                onError: (error) => {
+                  const message =
+                    error instanceof Error
+                      ? error.message
+                      : "Unable to initiate payment.";
+
+                  setPaymentError(message);
+                },
+              });
+            },
+
+            onError: (error) => {
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : "Unable to create payment.";
+
+              setPaymentError(message);
+            },
+          },
+        );
+
+        return;
+      }
+
+      /*
+       * Do not start Razorpay for an already successful/refunded
+       * payment.
+       */
       return;
     }
 
     /*
-     * IMPORTANT:
-     * Do NOT send amount.
-     *
-     * Backend calculates the amount from order.finalPrice.
+     * -------------------------------------------------------------
+     * NO PAYMENT YET
+     * -------------------------------------------------------------
      */
+
     createPaymentMutation.mutate(
       {
         orderId: order._id,
@@ -159,11 +307,41 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
       },
       {
         onSuccess: (createdPayment) => {
-          initiatePaymentMutation.mutate(createdPayment._id);
+          initiatePaymentMutation.mutate(createdPayment._id, {
+            onSuccess: () => {
+              startRazorpayCheckout(createdPayment._id);
+            },
+
+            onError: (error) => {
+              const message =
+                error instanceof Error
+                  ? error.message
+                  : "Unable to initiate payment.";
+
+              setPaymentError(message);
+            },
+          });
+        },
+
+        onError: (error) => {
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Unable to create payment.";
+
+          setPaymentError(message);
         },
       },
     );
   };
+
+  /*
+   * Payment processing state.
+   *
+   * Razorpay itself is handled by RazorpayCheckout.
+   */
+  const isPaymentProcessing =
+    isPaymentCreating || isPaymentInitiating || showRazorpay;
 
   return (
     <main className="min-h-screen bg-slate-50">
@@ -182,9 +360,7 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
         <header className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-sm font-medium text-blue-600">
-                Order Details
-              </p>
+              <p className="text-sm font-medium text-blue-600">Order Details</p>
 
               <h1 className="mt-1 break-all text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                 #{order._id}
@@ -236,10 +412,7 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
                   value={new Date(order.pickupDate).toLocaleDateString()}
                 />
 
-                <InfoItem
-                  label="Pickup Time"
-                  value={order.pickupTimeSlot}
-                />
+                <InfoItem label="Pickup Time" value={order.pickupTimeSlot} />
 
                 <InfoItem
                   label="Detergent"
@@ -302,9 +475,7 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
 
                 <InfoItem
                   label="Pricing Status"
-                  value={order.pricingStatus
-                    .replaceAll("_", " ")
-                    .toLowerCase()}
+                  value={order.pricingStatus.replaceAll("_", " ").toLowerCase()}
                 />
               </div>
 
@@ -362,9 +533,7 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
               <div className="mt-6">
                 <InfoItem
                   label="Order Payment Status"
-                  value={order.paymentStatus
-                    .replaceAll("_", " ")
-                    .toLowerCase()}
+                  value={order.paymentStatus.replaceAll("_", " ").toLowerCase()}
                 />
               </div>
             </section>
@@ -379,24 +548,31 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
 
                 <PaymentSummary payment={payment} />
 
+                {/* Payment error */}
+                {paymentError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+                    <p className="text-sm font-medium text-red-800">
+                      Payment Error
+                    </p>
+
+                    <p className="mt-1 text-sm text-red-700">{paymentError}</p>
+                  </div>
+                )}
+
                 {/* Pending payment */}
                 {payment.status === "PENDING" && canPay && (
                   <>
                     <PaymentMethodSelector
                       value={payment.paymentMethod || paymentMethod}
                       onChange={setPaymentMethod}
-                      disabled={
-                        isPaymentCreating || isPaymentInitiating
-                      }
+                      disabled={isPaymentProcessing}
                     />
 
                     <PaymentButton
                       amount={payment.amount}
-                      paymentMethod={
-                        payment.paymentMethod || paymentMethod
-                      }
+                      paymentMethod={payment.paymentMethod || paymentMethod}
                       isCreating={isPaymentCreating}
-                      isProcessing={isPaymentInitiating}
+                      isProcessing={isPaymentInitiating || showRazorpay}
                       onPay={handlePay}
                     />
                   </>
@@ -408,18 +584,14 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
                     <PaymentMethodSelector
                       value={paymentMethod}
                       onChange={setPaymentMethod}
-                      disabled={
-                        isPaymentCreating || isPaymentInitiating
-                      }
+                      disabled={isPaymentProcessing}
                     />
 
                     <PaymentButton
                       amount={payment.amount}
-                      paymentMethod={
-                        payment.paymentMethod || paymentMethod
-                      }
+                      paymentMethod={payment.paymentMethod || paymentMethod}
                       isCreating={isPaymentCreating}
-                      isProcessing={isPaymentInitiating}
+                      isProcessing={isPaymentInitiating || showRazorpay}
                       onPay={handlePay}
                     />
                   </>
@@ -433,16 +605,14 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
                 <PaymentMethodSelector
                   value={paymentMethod}
                   onChange={setPaymentMethod}
-                  disabled={
-                    isPaymentCreating || isPaymentInitiating
-                  }
+                  disabled={isPaymentProcessing}
                 />
 
                 <PaymentButton
                   amount={finalPrice}
                   paymentMethod={paymentMethod}
                   isCreating={isPaymentCreating}
-                  isProcessing={isPaymentInitiating}
+                  isProcessing={isPaymentInitiating || showRazorpay}
                   onPay={handlePay}
                 />
               </div>
@@ -457,7 +627,7 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
               </div>
             )}
 
-            {/* Payment error */}
+            {/* Payment error from payment query */}
             {isPaymentError && (
               <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
                 <p className="text-sm font-medium text-yellow-800">
@@ -482,6 +652,41 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
                 </p>
               </div>
             )}
+
+            {/* ------------------------------------------------------- */}
+            {/* RAZORPAY CHECKOUT                                       */}
+            {/* ------------------------------------------------------- */}
+            {showRazorpay && activePaymentId && (
+              <RazorpayCheckout
+                paymentId={activePaymentId}
+                autoOpen
+                onSuccess={() => {
+                  setShowRazorpay(false);
+                  setActivePaymentId(null);
+                  setPaymentError(null);
+
+                  /*
+                   * Refresh the order so the UI can reflect:
+                   *
+                   * paymentStatus = PAID
+                   */
+                  void refetch();
+
+                  /*
+                   * Reloading guarantees that the payment
+                   * query is also refreshed even if its query
+                   * cache is not invalidated by the verification
+                   * request.
+                   */
+                  window.location.reload();
+                }}
+                onError={(message) => {
+                  setPaymentError(message);
+                  setShowRazorpay(false);
+                  setActivePaymentId(null);
+                }}
+              />
+            )}
           </aside>
         </div>
       </div>
@@ -489,13 +694,7 @@ export default function OrderDetails({ orderId }: OrderDetailsProps) {
   );
 }
 
-function InfoItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-xs font-medium uppercase tracking-wide text-slate-400">

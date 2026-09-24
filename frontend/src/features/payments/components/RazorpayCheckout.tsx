@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   createRazorpayOrder,
@@ -9,6 +9,7 @@ import {
 
 interface RazorpayCheckoutProps {
   paymentId: string;
+  autoOpen?: boolean;
   onSuccess?: () => void;
   onError?: (message: string) => void;
 }
@@ -49,6 +50,8 @@ declare global {
   }
 }
 
+const RAZORPAY_SCRIPT_URL = "https://checkout.razorpay.com/v1/checkout.js";
+
 const loadRazorpayScript = (): Promise<boolean> => {
   return new Promise((resolve) => {
     if (typeof window === "undefined") {
@@ -62,18 +65,19 @@ const loadRazorpayScript = (): Promise<boolean> => {
     }
 
     const existingScript = document.querySelector(
-      'script[src="https://checkout.razorpay.com/v1/checkout.js"]',
+      `script[src="${RAZORPAY_SCRIPT_URL}"]`,
     );
 
     if (existingScript) {
       existingScript.addEventListener("load", () => resolve(true));
       existingScript.addEventListener("error", () => resolve(false));
+
       return;
     }
 
     const script = document.createElement("script");
 
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.src = RAZORPAY_SCRIPT_URL;
     script.async = true;
 
     script.onload = () => resolve(true);
@@ -86,10 +90,27 @@ const loadRazorpayScript = (): Promise<boolean> => {
 
 export default function RazorpayCheckout({
   paymentId,
+  autoOpen = true,
   onSuccess,
   onError,
 }: RazorpayCheckoutProps) {
   const [isLoading, setIsLoading] = useState(false);
+
+  const hasOpenedRef = useRef(false);
+
+  useEffect(() => {
+    if (!paymentId || !autoOpen) {
+      return;
+    }
+
+    if (hasOpenedRef.current) {
+      return;
+    }
+
+    hasOpenedRef.current = true;
+
+    void handlePayment();
+  }, [paymentId, autoOpen]);
 
   const handlePayment = async () => {
     if (isLoading) {
@@ -99,9 +120,11 @@ export default function RazorpayCheckout({
     try {
       setIsLoading(true);
 
-      /* -------------------------------------------------------------------- */
-      /*                     LOAD RAZORPAY CHECKOUT                           */
-      /* -------------------------------------------------------------------- */
+      /*
+       * ---------------------------------------------------------------
+       * LOAD RAZORPAY CHECKOUT
+       * ---------------------------------------------------------------
+       */
 
       const scriptLoaded = await loadRazorpayScript();
 
@@ -111,39 +134,49 @@ export default function RazorpayCheckout({
         );
       }
 
-      /* -------------------------------------------------------------------- */
-      /*                       RAZORPAY KEY                                   */
-      /* -------------------------------------------------------------------- */
+      /*
+       * ---------------------------------------------------------------
+       * RAZORPAY KEY
+       * ---------------------------------------------------------------
+       */
 
       const keyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
 
       if (!keyId) {
-        throw new Error(
-          "Razorpay key is not configured.",
-        );
+        throw new Error("Razorpay key is not configured.");
       }
 
-      /* -------------------------------------------------------------------- */
-      /*                    CREATE RAZORPAY ORDER                             */
-      /* -------------------------------------------------------------------- */
+      /*
+       * ---------------------------------------------------------------
+       * CREATE RAZORPAY ORDER
+       * ---------------------------------------------------------------
+       *
+       * This calls:
+       *
+       * POST /payments/:paymentId/razorpay-order
+       *
+       * The backend creates the Razorpay order and returns:
+       *
+       * gatewayOrderId
+       * amountInPaise
+       * currency
+       */
 
       const razorpayOrder = await createRazorpayOrder(paymentId);
 
       if (!razorpayOrder.gatewayOrderId) {
-        throw new Error(
-          "Razorpay order ID was not returned by the server.",
-        );
+        throw new Error("Razorpay order ID was not returned by the server.");
       }
 
-      if (!razorpayOrder.amountInPaise) {
-        throw new Error(
-          "Invalid Razorpay payment amount.",
-        );
+      if (!razorpayOrder.amountInPaise || razorpayOrder.amountInPaise <= 0) {
+        throw new Error("Invalid Razorpay payment amount.");
       }
 
-      /* -------------------------------------------------------------------- */
-      /*                      RAZORPAY CHECKOUT                               */
-      /* -------------------------------------------------------------------- */
+      /*
+       * ---------------------------------------------------------------
+       * RAZORPAY CHECKOUT OPTIONS
+       * ---------------------------------------------------------------
+       */
 
       const options: RazorpayOptions = {
         key: keyId,
@@ -162,9 +195,11 @@ export default function RazorpayCheckout({
           try {
             setIsLoading(true);
 
-            /* -------------------------------------------------------------- */
-            /*                  VERIFY PAYMENT ON SERVER                      */
-            /* -------------------------------------------------------------- */
+            /*
+             * ---------------------------------------------------------
+             * VERIFY PAYMENT ON BACKEND
+             * ---------------------------------------------------------
+             */
 
             await verifyRazorpayPayment(paymentId, {
               razorpayPaymentId: response.razorpay_payment_id,
@@ -200,14 +235,18 @@ export default function RazorpayCheckout({
         },
       };
 
+      /*
+       * ---------------------------------------------------------------
+       * OPEN RAZORPAY
+       * ---------------------------------------------------------------
+       */
+
       const razorpay = new window.Razorpay(options);
 
       razorpay.open();
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to start payment.";
+        error instanceof Error ? error.message : "Unable to start payment.";
 
       setIsLoading(false);
 
@@ -215,16 +254,17 @@ export default function RazorpayCheckout({
     }
   };
 
-  return (
-    <button
-      type="button"
-      onClick={handlePayment}
-      disabled={isLoading}
-      className="w-full rounded-xl bg-gray-900 px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {isLoading
-        ? "Processing payment..."
-        : "Pay Now"}
-    </button>
-  );
+  /*
+   * This component does not render a second Pay button.
+   *
+   * OrderDetails already has the main:
+   *
+   * Pay ₹75
+   *
+   * button.
+   *
+   * RazorpayCheckout only handles the Razorpay process.
+   */
+
+  return null;
 }
