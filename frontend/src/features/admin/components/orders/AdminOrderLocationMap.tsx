@@ -18,7 +18,7 @@ interface AdminOrderLocationMapProps {
 }
 
 const customerIcon = L.divIcon({
-  className: "freshfold-map-marker",
+  className: "Woosh-map-marker",
   html: `
     <div
       style="

@@ -117,7 +117,7 @@ export const useAuthStore = create<AuthState>()(
     }),
 
     {
-      name: "freshfold-auth",
+      name: "Woosh-auth",
 
       /*
        * Only authentication data is persisted.

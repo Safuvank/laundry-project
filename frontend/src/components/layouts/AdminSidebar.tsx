@@ -79,7 +79,7 @@ export default function AdminSidebar() {
           href="/admin"
           className="text-xl font-bold tracking-tight text-slate-900"
         >
-          FreshFold
+          Woosh
         </Link>
 
         <p className="mt-1 text-xs font-medium uppercase tracking-wider text-slate-400">

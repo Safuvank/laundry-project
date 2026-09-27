@@ -35,10 +35,10 @@ export default function GoogleCallbackPage() {
          * STEP 1
          * --------------------------------------------------------------------
          *
-         * The backend Google callback has already stored the FreshFold
+         * The backend Google callback has already stored the Woosh
          * refresh token inside an HTTP-only cookie.
          *
-         * We now exchange that refresh token for a FreshFold access token.
+         * We now exchange that refresh token for a Woosh access token.
          */
 
         const refreshResponse =
@@ -55,7 +55,7 @@ export default function GoogleCallbackPage() {
          * STEP 2
          * --------------------------------------------------------------------
          *
-         * Fetch the authenticated FreshFold user.
+         * Fetch the authenticated Woosh user.
          *
          * Axios request interceptor will automatically attach:
          *

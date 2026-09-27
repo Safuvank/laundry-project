@@ -67,7 +67,7 @@ export default function Navbar() {
           onClick={() => setIsMobileMenuOpen(false)}
           className="text-2xl font-bold tracking-tight text-slate-900"
         >
-          FreshFold
+          Woosh
         </Link>
 
         {/* Desktop Navigation */}

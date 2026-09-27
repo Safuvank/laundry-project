@@ -123,7 +123,7 @@ export default function AdminDashboard() {
         </h1>
 
         <p className="mt-1 text-sm text-gray-500">
-          Monitor FreshFold operations, deliveries, agents, and revenue.
+          Monitor Woosh operations, deliveries, agents, and revenue.
         </p>
       </div>
 

@@ -99,7 +99,7 @@ export default function ChangePassword() {
         </h2>
 
         <p className="mt-1 text-sm text-gray-500">
-          Change your password to keep your FreshFold account secure.
+          Change your password to keep your Woosh account secure.
         </p>
       </div>
 

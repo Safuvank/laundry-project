@@ -1,7 +1,7 @@
 import Hero from "@/features/public/components/Hero";
 import ServiceSection from "@/features/public/components/ServiceSection";
 import HowItWorks from "@/features/public/components/HowItWorks";
-import WhyFreshFold from "@/features/public/components/WhyFreshFold";
+import WhyWoosh from "@/features/public/components/WhyWoosh";
 import CTASection from "@/features/public/components/CTASection";
 
 export default function HomePage() {
@@ -10,7 +10,7 @@ export default function HomePage() {
       <Hero />
       <ServiceSection />
       <HowItWorks />
-      <WhyFreshFold />
+      <WhyWoosh />
       <CTASection />
     </>
   );

@@ -304,7 +304,7 @@ export default function PreferencesStep() {
 
             <p className="mt-1 text-xs leading-5 text-slate-500">
               These preferences will be included with your
-              laundry order and shared with the FreshFold
+              laundry order and shared with the Woosh
               processing team.
             </p>
           </div>

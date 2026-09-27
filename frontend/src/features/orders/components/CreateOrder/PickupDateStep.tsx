@@ -159,7 +159,7 @@ export default function PickupDateStep() {
           <span className="mt-0.5 text-sm">ℹ️</span>
 
           <p className="text-xs leading-5 text-slate-500">
-            Pickup time slots are managed by FreshFold and
+            Pickup time slots are managed by Woosh and
             depend on the availability configured for your
             selected date.
           </p>

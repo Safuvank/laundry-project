@@ -22,7 +22,7 @@ export default function DeliveryPage() {
 
         <header>
           <p className="text-sm font-medium text-gray-500">
-            FreshFold Delivery
+            Woosh Delivery
           </p>
 
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-900">

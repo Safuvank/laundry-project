@@ -65,7 +65,7 @@ export class AuthController {
      *
      * Browser:
      *
-     * FreshFold
+     * Woosh
      *    ↓
      * /auth/google
      *    ↓
@@ -94,7 +94,7 @@ export class AuthController {
 
     /*
      * Exchange the Google authorization code for a
-     * FreshFold authentication session.
+     * Woosh authentication session.
      *
      * AuthService handles:
      *
@@ -102,13 +102,13 @@ export class AuthController {
      * - Google ID-token verification
      * - Finding existing Google users
      * - Creating new Google users
-     * - Creating FreshFold access/refresh tokens
+     * - Creating Woosh access/refresh tokens
      */
 
     const { refreshToken } = await authService.googleCallback(code);
 
     /*
-     * Store FreshFold refresh token in an HTTP-only cookie.
+     * Store Woosh refresh token in an HTTP-only cookie.
      *
      * The access token is intentionally NOT placed in
      * the URL.

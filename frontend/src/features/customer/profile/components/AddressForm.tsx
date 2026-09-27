@@ -439,7 +439,7 @@ export default function AddressForm({
               </p>
 
               <p className="mt-1 text-xs leading-5 text-blue-700">
-                FreshFold uses your current location to accurately coordinate
+                Woosh uses your current location to accurately coordinate
                 pickup and delivery.
               </p>
             </div>

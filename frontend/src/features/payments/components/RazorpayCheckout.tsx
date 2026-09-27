@@ -185,9 +185,9 @@ export default function RazorpayCheckout({
 
         currency: razorpayOrder.currency,
 
-        name: "FreshFold",
+        name: "Woosh",
 
-        description: "FreshFold Laundry Payment",
+        description: "Woosh Laundry Payment",
 
         order_id: razorpayOrder.gatewayOrderId,
 

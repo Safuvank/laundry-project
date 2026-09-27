@@ -83,7 +83,7 @@ export default function ProfileInformation({
         </h2>
 
         <p className="mt-1 text-sm text-gray-500">
-          Update your personal information associated with your FreshFold
+          Update your personal information associated with your Woosh
           account.
         </p>
       </div>

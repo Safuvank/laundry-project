@@ -19,7 +19,7 @@ const router = Router();
 /* -------------------------------------------------------------------------- */
 
 /**
- * Create FreshFold payment
+ * Create Woosh payment
  *
  * POST /api/v1/payments
  *
@@ -69,9 +69,9 @@ router.get("/order/:orderId", authenticate, paymentController.getByOrderId);
  *
  * Backend:
  *
- * 1. Finds the FreshFold payment
+ * 1. Finds the Woosh payment
  * 2. Verifies payment ownership
- * 3. Gets the amount from the FreshFold payment
+ * 3. Gets the amount from the Woosh payment
  * 4. Creates Razorpay order
  * 5. Saves gatewayOrderId
  * 6. Changes PENDING → INITIATED
@@ -96,7 +96,7 @@ router.post(
  *
  * Backend:
  *
- * 1. Finds the FreshFold payment
+ * 1. Finds the Woosh payment
  * 2. Verifies payment ownership
  * 3. Verifies payment status
  * 4. Verifies Razorpay order ID

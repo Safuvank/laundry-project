@@ -125,7 +125,7 @@ export default function ProfileImageUpload({
         </h2>
 
         <p className="mt-1 text-sm text-gray-500">
-          Upload a profile picture to personalize your FreshFold account.
+          Upload a profile picture to personalize your Woosh account.
         </p>
       </div>
 

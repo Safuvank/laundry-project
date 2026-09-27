@@ -49,7 +49,7 @@ export default function RegisterPage() {
               </svg>
             </div>
             <span className="text-xl font-bold tracking-tight text-gray-900">
-              freshfold
+              Woosh
             </span>
           </div>
 
@@ -58,7 +58,7 @@ export default function RegisterPage() {
               Create your account
             </h1>
             <p className="mt-2 text-sm text-gray-500">
-              Join FreshFold and manage your laundry easily.
+              Join Woosh and manage your laundry easily.
             </p>
           </div>
 

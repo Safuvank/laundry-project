@@ -152,8 +152,8 @@ export default function ContactPage() {
                     Prefer to email? Send us a message and we'll respond within 24 hours.
                   </p>
                   <p className="mt-4">
-                    <a href="mailto:support@freshfold.com" className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors">
-                      support@freshfold.com
+                    <a href="mailto:support@Woosh.com" className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors">
+                      support@Woosh.com
                     </a>
                   </p>
                 </div>

@@ -284,7 +284,7 @@ export default function ReviewStep() {
 
             <p className="mt-1 text-xs leading-5 text-blue-700">
               Make sure your pickup date and time are
-              correct. When you place the order, FreshFold
+              correct. When you place the order, Woosh
               will verify the selected pickup slot and
               reserve its capacity.
             </p>

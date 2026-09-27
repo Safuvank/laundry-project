@@ -136,7 +136,7 @@ const OrderActions = ({
               </h2>
 
               <p className="mt-2 text-sm text-gray-600">
-                Are you sure this order has been received at the FreshFold
+                Are you sure this order has been received at the Woosh
                 facility?
               </p>
 

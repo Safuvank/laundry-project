@@ -55,7 +55,7 @@ export default function HowItWorks() {
             Simple Process
           </p>
           <h2 className="mt-2 text-3xl font-semibold tracking-tight text-gray-900 sm:text-4xl">
-            How FreshFold Works
+            How Woosh Works
           </h2>
           <p className="mt-4 text-lg text-gray-500">
             We've streamlined the laundry process so you can get back to doing what you love. Fresh clothes are just a few taps away.

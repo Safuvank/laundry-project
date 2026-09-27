@@ -11,7 +11,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "FreshFold",
+  title: "Woosh",
   description: "Laundry Management System",
 };
 

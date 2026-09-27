@@ -27,7 +27,7 @@ export default function Hero() {
         <div className="z-10">
           <p className="mb-4 flex items-center justify-center md:justify-start text-sm font-bold uppercase tracking-widest text-blue-400">
             <span className="mr-2 inline-block h-1.5 w-1.5 rounded-full bg-blue-400"></span>
-            FreshFold Laundry
+            Woosh Laundry
           </p>
 
           <h1 className="text-4xl font-extrabold tracking-tight text-white md:text-5xl lg:text-6xl drop-shadow-md">

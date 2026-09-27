@@ -218,7 +218,7 @@ class PaymentRepository {
   /**
    * Save the gateway/Razorpay order ID.
    *
-   * This connects the FreshFold payment
+   * This connects the Woosh payment
    * with the Razorpay order.
    */
   async setGatewayOrderId(

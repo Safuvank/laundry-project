@@ -181,7 +181,7 @@ export default function OrderTimeline({ currentStatus }: OrderTimelineProps) {
 
           <p className="mt-1 text-sm text-orange-700">
             The final price was not approved. Please wait for further
-            instructions from FreshFold.
+            instructions from Woosh.
           </p>
         </div>
       </section>

@@ -33,7 +33,7 @@ const features = [
   },
 ];
 
-export default function WhyFreshFold() {
+export default function WhyWoosh() {
   return (
     <section className="overflow-hidden bg-white py-16 md:py-24 border-b border-gray-200">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">

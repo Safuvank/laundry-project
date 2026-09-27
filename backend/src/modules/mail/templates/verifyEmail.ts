@@ -34,7 +34,7 @@ export const verifyEmailTemplate = ({
   "
 >
 
-<h2>Welcome to FreshFold 👋</h2>
+<h2>Welcome to Woosh 👋</h2>
 
 <p>
 Hello <strong>${firstName}</strong>,

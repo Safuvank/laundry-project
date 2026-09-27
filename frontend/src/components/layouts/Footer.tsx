@@ -5,9 +5,9 @@ export default function Footer() {
     <footer className="border-t border-gray-200 bg-gray-50">
       <div className="mx-auto grid max-w-7xl gap-10 px-6 py-12 md:grid-cols-3">
         <div>
-          {/* Changed FreshFold color to blue-600 */}
+          {/* Changed Woosh color to blue-600 */}
           <Link href="/" className="text-2xl font-bold text-blue-600 tracking-tight">
-            FreshFold
+            Woosh
           </Link>
 
           <p className="mt-4 max-w-sm text-sm text-gray-600">
@@ -43,7 +43,7 @@ export default function Footer() {
 
       <div className="border-t border-gray-200">
         <div className="mx-auto max-w-7xl px-6 py-6 text-sm text-gray-500">
-          © {new Date().getFullYear()} FreshFold. All rights reserved.
+          © {new Date().getFullYear()} Woosh. All rights reserved.
         </div>
       </div>
     </footer>

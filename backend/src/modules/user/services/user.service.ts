@@ -110,7 +110,7 @@ export class UserService {
     | OAuth Account Protection
     |--------------------------------------------------------------------------
     |
-    | Google accounts do not have a FreshFold password.
+    | Google accounts do not have a Woosh password.
     | They must manage authentication through Google.
     |
     */

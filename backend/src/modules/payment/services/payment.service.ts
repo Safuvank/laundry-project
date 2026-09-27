@@ -54,7 +54,7 @@ export class PaymentService {
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Create a FreshFold payment for an order.
+   * Create a Woosh payment for an order.
    *
    * The payment amount is always taken from the order's finalPrice.
    *
@@ -133,17 +133,17 @@ export class PaymentService {
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Create a Razorpay order for an existing FreshFold payment.
+   * Create a Razorpay order for an existing Woosh payment.
    *
    * Flow:
    *
-   * FreshFold Payment
+   * Woosh Payment
    *        ↓
    * Validate ownership
    *        ↓
    * Validate payment status
    *        ↓
-   * Get amount from FreshFold Payment
+   * Get amount from Woosh Payment
    *        ↓
    * Convert INR → paise
    *        ↓
@@ -245,7 +245,7 @@ export class PaymentService {
     const razorpayOrder = await razorpayService.createOrder({
       amount: payment.amount,
       currency: "INR",
-      receipt: `freshfold_${payment._id!.toString()}`,
+      receipt: `Woosh_${payment._id!.toString()}`,
     });
 
     if (!razorpayOrder?.id) {
@@ -272,7 +272,7 @@ export class PaymentService {
     /**
      * Razorpay order has successfully been created.
      *
-     * Therefore FreshFold payment moves:
+     * Therefore Woosh payment moves:
      *
      * PENDING → INITIATED
      */
@@ -490,7 +490,7 @@ export class PaymentService {
    * razorpay_order_id
    * razorpay_signature
    *        ↓
-   * Validate FreshFold payment
+   * Validate Woosh payment
    *        ↓
    * Validate Razorpay order ID
    *        ↓

@@ -52,7 +52,7 @@ export default function AboutPage() {
             We're on a mission to give you your <span className="text-blue-600">weekend back.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-gray-500">
-            Laundry is a chore that never truly ends. We built FreshFold to change that. We combine expert garment care with seamless technology so you never have to think about laundry day again.
+            Laundry is a chore that never truly ends. We built Woosh to change that. We combine expert garment care with seamless technology so you never have to think about laundry day again.
           </p>
         </div>
       </section>
@@ -80,7 +80,7 @@ export default function AboutPage() {
               </h2>
               <div className="mt-8 space-y-6 text-base leading-relaxed text-gray-500">
                 <p>
-                  FreshFold started in 2018 when our founders realized they were spending an average of 4 hours every weekend sorting, washing, and folding. Local laundromats were inconvenient, and high-end dry cleaners were too expensive for everyday wear.
+                  Woosh started in 2018 when our founders realized they were spending an average of 4 hours every weekend sorting, washing, and folding. Local laundromats were inconvenient, and high-end dry cleaners were too expensive for everyday wear.
                 </p>
                 <p>
                   We knew there had to be a better way. We envisioned a service that married the precision of a high-end dry cleaner with the seamless digital experience of a modern app. 

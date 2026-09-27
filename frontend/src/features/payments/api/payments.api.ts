@@ -19,11 +19,11 @@ interface ApiErrorResponse {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                         CREATE FRESHFOLD PAYMENT                           */
+/*                         CREATE Woosh PAYMENT                           */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Create a FreshFold payment record.
+ * Create a Woosh payment record.
  *
  * POST /api/v1/payments
  *
@@ -159,7 +159,7 @@ export interface CreateRazorpayOrderResponse {
 }
 
 /**
- * Create a Razorpay order for an existing FreshFold payment.
+ * Create a Razorpay order for an existing Woosh payment.
  *
  * POST /api/v1/payments/:id/razorpay-order
  *
@@ -173,7 +173,7 @@ export interface CreateRazorpayOrderResponse {
  *
  * The backend gets the amount from:
  *
- * FreshFold Payment
+ * Woosh Payment
  *       ↓
  * Order
  *       ↓
@@ -249,7 +249,7 @@ export interface VerifyRazorpayPaymentResponse {
 }
 
 /**
- * Verify a Razorpay payment on the FreshFold backend.
+ * Verify a Razorpay payment on the Woosh backend.
  *
  * POST /api/v1/payments/:id/verify
  *
@@ -328,11 +328,11 @@ export const verifyRazorpayPayment = async (
  * PATCH /api/v1/payments/:id/initiate
  *
  * This endpoint is still used by the current
- * FreshFold payment flow before Razorpay Checkout.
+ * Woosh payment flow before Razorpay Checkout.
  *
  * Flow:
  *
- * FreshFold Payment
+ * Woosh Payment
  *       ↓
  * initiatePayment()
  *       ↓

@@ -50,14 +50,14 @@ class PaymentController {
   /* -------------------------------------------------------------------------- */
 
   /**
-   * Create a Razorpay order for an existing FreshFold payment.
+   * Create a Razorpay order for an existing Woosh payment.
    *
    * POST /api/v1/payments/:id/razorpay-order
    *
    * IMPORTANT:
    * - Amount is NOT accepted from the frontend.
-   * - PaymentService gets the amount from the FreshFold payment.
-   * - FreshFold payment must belong to the authenticated customer.
+   * - PaymentService gets the amount from the Woosh payment.
+   * - Woosh payment must belong to the authenticated customer.
    * - Razorpay order ID is stored in gatewayOrderId.
    */
   createRazorpayOrder = asyncHandler(async (req: Request, res: Response) => {

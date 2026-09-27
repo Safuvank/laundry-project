@@ -261,7 +261,7 @@ export class AuthService {
    * 4. Find existing Google account.
    * 5. Find existing email account.
    * 6. Create new Google account if necessary.
-   * 7. Create FreshFold authentication session.
+   * 7. Create Woosh authentication session.
    */
 
   async googleCallback(code: string) {
@@ -401,7 +401,7 @@ export class AuthService {
      * ------------------------------------------------------------------------
      * CASE 2
      *
-     * Existing FreshFold account with same email.
+     * Existing Woosh account with same email.
      *
      * We do NOT automatically link Google to an existing LOCAL account.
      *
@@ -449,7 +449,7 @@ export class AuthService {
     });
 
     /*
-     * Create FreshFold authentication session.
+     * Create Woosh authentication session.
      */
     return this.createAuthSession(user);
   }

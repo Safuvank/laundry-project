@@ -14,7 +14,7 @@ export default function LoginPage() {
               </svg>
             </div>
             <span className="text-xl font-bold tracking-tight text-gray-900">
-              freshfold
+              Woosh
             </span>
           </div>
 

@@ -298,7 +298,7 @@ export default function NotificationsPage() {
               </h2>
 
               <p className="mt-0.5 text-xs text-gray-500">
-                Your latest FreshFold updates
+                Your latest Woosh updates
               </p>
             </div>
 
