@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import ContactForm from "@/features/public/components/ContactForm";
 
 export default function ContactPage() {
   return (
@@ -26,115 +27,7 @@ export default function ContactPage() {
           <div className="grid grid-cols-1 gap-x-16 gap-y-16 lg:grid-cols-2">
             
             {/* Left Column: Contact Form */}
-            <div className="rounded-2xl bg-gray-50 p-8 ring-1 ring-inset ring-gray-200 sm:p-10">
-              <h2 className="text-2xl font-semibold tracking-tight text-gray-900">
-                Send us a message
-              </h2>
-              <p className="mt-2 text-sm text-gray-500">
-                Fill out the form below and we'll be in touch shortly.
-              </p>
-
-              <form className="mt-8 space-y-6">
-                <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-                  {/* First Name */}
-                  <div>
-                    <label htmlFor="first-name" className="block text-sm font-medium leading-6 text-gray-900">
-                      First name
-                    </label>
-                    <div className="mt-2.5">
-                      <input
-                        type="text"
-                        name="first-name"
-                        id="first-name"
-                        autoComplete="given-name"
-                        className="block w-full rounded-lg border-0 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 transition-colors"
-                        placeholder="John"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Last Name */}
-                  <div>
-                    <label htmlFor="last-name" className="block text-sm font-medium leading-6 text-gray-900">
-                      Last name
-                    </label>
-                    <div className="mt-2.5">
-                      <input
-                        type="text"
-                        name="last-name"
-                        id="last-name"
-                        autoComplete="family-name"
-                        className="block w-full rounded-lg border-0 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 transition-colors"
-                        placeholder="Doe"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium leading-6 text-gray-900">
-                    Email address
-                  </label>
-                  <div className="mt-2.5">
-                    <input
-                      type="email"
-                      name="email"
-                      id="email"
-                      autoComplete="email"
-                      className="block w-full rounded-lg border-0 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 transition-colors"
-                      placeholder="john@example.com"
-                    />
-                  </div>
-                </div>
-
-                {/* Subject */}
-                <div>
-                  <label htmlFor="subject" className="block text-sm font-medium leading-6 text-gray-900">
-                    Subject
-                  </label>
-                  <div className="mt-2.5">
-                    <select
-                      id="subject"
-                      name="subject"
-                      className="block w-full rounded-lg border-0 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 transition-colors bg-white"
-                    >
-                      <option>General Inquiry</option>
-                      <option>Question about an Order</option>
-                      <option>Pricing & Services</option>
-                      <option>Partnerships</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Message */}
-                <div>
-                  <label htmlFor="message" className="block text-sm font-medium leading-6 text-gray-900">
-                    Message
-                  </label>
-                  <div className="mt-2.5">
-                    <textarea
-                      name="message"
-                      id="message"
-                      rows={4}
-                      className="block w-full rounded-lg border-0 px-4 py-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 transition-colors"
-                      placeholder="How can we help you?"
-                      defaultValue={""}
-                    />
-                  </div>
-                </div>
-
-                {/* Submit Button */}
-                <div>
-                  <button
-                    type="submit"
-                    className="block w-full rounded-lg bg-blue-600 px-8 py-3.5 text-center text-sm font-semibold text-white shadow-sm transition-colors hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-                  >
-                    Send Message
-                  </button>
-                </div>
-              </form>
-            </div>
+            <ContactForm />
 
             {/* Right Column: Contact Information */}
             <div className="flex flex-col justify-center gap-10 lg:pl-8">
@@ -153,7 +46,7 @@ export default function ContactPage() {
                   </p>
                   <p className="mt-4">
                     <a href="mailto:support@Woosh.com" className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors">
-                      support@Woosh.com
+                      support@woosh.com
                     </a>
                   </p>
                 </div>
@@ -173,7 +66,7 @@ export default function ContactPage() {
                   </p>
                   <p className="mt-4">
                     <a href="tel:+18005550199" className="text-sm font-semibold text-blue-600 hover:text-blue-500 transition-colors">
-                      +1 (800) 555-0199
+                      +91 99611 09630
                     </a>
                   </p>
                 </div>
@@ -193,9 +86,9 @@ export default function ContactPage() {
                     Our main processing facility and corporate office.
                   </p>
                   <address className="mt-4 not-italic text-sm font-medium text-gray-900">
-                    123 Clean Street<br />
-                    Suite 100<br />
-                    San Francisco, CA 94103
+                    Model Colony, Yeshwandapur <br />
+                    Banglore<br />
+                    Karnataka, 560022
                   </address>
                 </div>
               </div>
@@ -214,13 +107,7 @@ export default function ContactPage() {
                   </p>
                   <div className="mt-4 flex flex-col gap-1 text-sm font-medium text-gray-900">
                     <div className="flex justify-between w-48">
-                      <span className="text-gray-500">Mon - Fri:</span> 8:00 AM - 8:00 PM
-                    </div>
-                    <div className="flex justify-between w-48">
-                      <span className="text-gray-500">Saturday:</span> 9:00 AM - 5:00 PM
-                    </div>
-                    <div className="flex justify-between w-48">
-                      <span className="text-gray-500">Sunday:</span> Closed
+                      <span className="text-gray-500">Mon - Sun:</span> 8:00 AM - 8:00 PM
                     </div>
                   </div>
                 </div>
