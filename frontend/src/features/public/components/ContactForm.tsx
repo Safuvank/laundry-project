@@ -6,6 +6,7 @@ interface ContactFormData {
   firstName: string;
   lastName: string;
   email: string;
+  phoneNumber: string; // Added phone number
   subject: string;
   message: string;
 }
@@ -15,9 +16,7 @@ export default function ContactForm() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleSubmit = async (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     setIsSubmitting(true);
@@ -25,25 +24,27 @@ export default function ContactForm() {
     setErrorMessage("");
 
     const form = event.currentTarget;
-
     const formData = new FormData(form);
 
     const data: ContactFormData = {
       firstName: String(formData.get("firstName") || ""),
       lastName: String(formData.get("lastName") || ""),
       email: String(formData.get("email") || ""),
+      phoneNumber: String(formData.get("phoneNumber") || ""), // Capture phone number
       subject: String(formData.get("subject") || ""),
       message: String(formData.get("message") || ""),
     };
 
     try {
-      const scriptUrl =
-        process.env.NEXT_PUBLIC_GOOGLE_CONTACT_FORM_URL;
+      const scriptUrl = process.env.NEXT_PUBLIC_GOOGLE_CONTACT_FORM_URL;
+
+      console.log(
+        "Google Apps Script URL:",
+        process.env.NEXT_PUBLIC_GOOGLE_CONTACT_FORM_URL,
+      );
 
       if (!scriptUrl) {
-        throw new Error(
-          "Contact form service is not configured.",
-        );
+        throw new Error("Contact form service is not configured.");
       }
 
       await fetch(scriptUrl, {
@@ -52,17 +53,11 @@ export default function ContactForm() {
         body: JSON.stringify(data),
       });
 
-      setSuccessMessage(
-        "Thank you! Your message has been sent successfully.",
-      );
-
+      setSuccessMessage("Thank you! Your message has been sent successfully.");
       form.reset();
     } catch (error) {
       console.error("Contact form error:", error);
-
-      setErrorMessage(
-        "Something went wrong. Please try again.",
-      );
+      setErrorMessage("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -78,10 +73,8 @@ export default function ContactForm() {
         Fill out the form below and we'll be in touch shortly.
       </p>
 
-      <form
-        onSubmit={handleSubmit}
-        className="mt-8 space-y-6"
-      >
+      <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+        {/* Name Grid */}
         <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
           {/* First Name */}
           <div>
@@ -91,7 +84,6 @@ export default function ContactForm() {
             >
               First name
             </label>
-
             <div className="mt-2.5">
               <input
                 type="text"
@@ -113,7 +105,6 @@ export default function ContactForm() {
             >
               Last name
             </label>
-
             <div className="mt-2.5">
               <input
                 type="text"
@@ -128,25 +119,48 @@ export default function ContactForm() {
           </div>
         </div>
 
-        {/* Email */}
-        <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium leading-6 text-gray-900"
-          >
-            Email address
-          </label>
+        {/* Contact Info Grid */}
+        <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
+          {/* Email */}
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium leading-6 text-gray-900"
+            >
+              Email address
+            </label>
+            <div className="mt-2.5">
+              <input
+                type="email"
+                name="email"
+                id="email"
+                autoComplete="email"
+                required
+                className="block w-full rounded-lg border-0 px-4 py-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 transition-colors"
+                placeholder="john@example.com"
+              />
+            </div>
+          </div>
 
-          <div className="mt-2.5">
-            <input
-              type="email"
-              name="email"
-              id="email"
-              autoComplete="email"
-              required
-              className="block w-full rounded-lg border-0 px-4 py-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 transition-colors"
-              placeholder="john@example.com"
-            />
+          {/* Phone Number */}
+          <div>
+            <label
+              htmlFor="phone-number"
+              className="block text-sm font-medium leading-6 text-gray-900"
+            >
+              Phone number
+            </label>
+            <div className="mt-2.5">
+              <input
+                type="tel"
+                name="phoneNumber"
+                id="phone-number"
+                autoComplete="tel"
+                required
+                className="block w-full rounded-lg border-0 px-4 py-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 transition-colors"
+                placeholder="+91 98765 43210"
+              />
+            </div>
           </div>
         </div>
 
@@ -158,7 +172,6 @@ export default function ContactForm() {
           >
             Subject
           </label>
-
           <div className="mt-2.5">
             <select
               id="subject"
@@ -166,21 +179,12 @@ export default function ContactForm() {
               required
               className="block w-full rounded-lg border-0 px-4 py-3 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6 transition-colors bg-white"
             >
-              <option value="General Inquiry">
-                General Inquiry
-              </option>
-
+              <option value="General Inquiry">General Inquiry</option>
               <option value="Question about an Order">
                 Question about an Order
               </option>
-
-              <option value="Pricing & Services">
-                Pricing & Services
-              </option>
-
-              <option value="Partnerships">
-                Partnerships
-              </option>
+              <option value="Pricing & Services">Pricing & Services</option>
+              <option value="Partnerships">Partnerships</option>
             </select>
           </div>
         </div>
@@ -193,7 +197,6 @@ export default function ContactForm() {
           >
             Message
           </label>
-
           <div className="mt-2.5">
             <textarea
               name="message"
@@ -227,9 +230,7 @@ export default function ContactForm() {
             disabled={isSubmitting}
             className="block w-full rounded-lg bg-blue-600 px-8 py-3.5 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
           >
-            {isSubmitting
-              ? "Sending..."
-              : "Send Message"}
+            {isSubmitting ? "Sending..." : "Send Message"}
           </button>
         </div>
       </form>
