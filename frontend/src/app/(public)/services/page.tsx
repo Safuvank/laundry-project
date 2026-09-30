@@ -8,7 +8,7 @@ const detailedServices = [
     title: "Wash & Fold",
     tagline: "Your everyday laundry, handled with care.",
     description: "Reclaim your weekend. We sort your lights and darks, wash them with premium hypoallergenic detergents, tumble dry on optimal settings, and meticulously fold everything so it's drawer-ready the moment we deliver it.",
-    price: "$1.50 / lb",
+    price: "From ₹80 / kg",
     features: [
       "Color sorting included",
       "Custom temperature settings",
@@ -23,7 +23,7 @@ const detailedServices = [
     title: "Dry Cleaning",
     tagline: "Professional care for your delicate and formal wear.",
     description: "For fabrics that need a gentler touch. Our eco-friendly dry cleaning process removes stubborn stains while protecting the integrity of your suits, dresses, and silk garments. Everything is returned perfectly pressed and hung.",
-    price: "$6.00 / item (avg)",
+    price: "From ₹150 / item",
     features: [
       "Eco-friendly solvents",
       "Stain pre-treatment",
@@ -38,7 +38,7 @@ const detailedServices = [
     title: "Wash & Ironing",
     tagline: "Freshly washed and perfectly pressed.",
     description: "The complete package for your everyday wardrobe. We carefully wash your garments using premium detergents, then professionally steam iron them to ensure a crisp, wrinkle-free finish. Delivered on hangers or neatly folded based on your preference.",
-    price: "$3.50 / item",
+    price: "From ₹100 / item",
     features: [
       "Gentle wash cycle",
       "Professional steam ironing",
@@ -53,7 +53,7 @@ const detailedServices = [
     title: "Ironing Only",
     tagline: "Crisp, wrinkle-free finishing for your attire.",
     description: "Already washed your clothes but hate ironing? Let us handle the tedious part. We provide professional high-pressure steam ironing for shirts, trousers, and dresses, ensuring sharp creases and a flawless look for your busy work week.",
-    price: "$2.50 / item",
+   price: "From ₹40 / item",
     features: [
       "High-pressure steam pressing",
       "Collar and cuff detailing",
